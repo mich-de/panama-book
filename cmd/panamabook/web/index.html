@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Panama Book</title>
+<link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M3 12h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-reread" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 14h6M10 17h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-mem" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11M9 8h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4l9 16H3zM12 10v4.5M12 17.2v.1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v5M12 7.8v.1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-zoomin" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5M11 8v6M8 11h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-zoomout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5M8 11h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-rot" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 0 1 0 12" transform="translate(0 -4)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<a class="skip" href="#fieldsCard">Vai ai dati</a>
+
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">PB</span>
+    <div>
+      <h1>Panama Book</h1>
+      <p class="sub">Lettura e correzione della Libreta de embarque</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <span id="demoBadge" class="badge-demo" hidden>PROVA: nessuno scanner</span>
+    <button type="button" class="review-pill" id="reviewPill" hidden aria-live="polite"><svg class="ic" aria-hidden="true"><use href="#i-warn"/></svg><span id="reviewPillText"></span></button>
+    <button type="button" class="btn" id="btnReset" title="Svuota la schermata e prepara una nuova scansione (Alt+N). Non cancella nessun file."><svg class="ic" aria-hidden="true"><use href="#i-reread"/></svg><span>Ricomincia da capo</span></button>
+    <button type="button" class="btn ghost" id="btnMem"><svg class="ic" aria-hidden="true"><use href="#i-mem"/></svg><span>Memoria <span id="memCount" class="count">0</span></span></button>
+  </div>
+</header>
+
+<div id="banners" class="banners" role="status" aria-live="polite"></div>
+
+<main class="layout">
+  <section class="col-left" aria-label="Immagine e promemoria">
+    <div class="card" id="previewCard">
+      <div class="card-head">
+        <h2>Anteprima</h2>
+        <div class="tools" role="toolbar" aria-label="Strumenti dell'anteprima">
+          <button type="button" class="btn icon" id="zOut" title="Riduci" aria-label="Riduci"><svg class="ic" aria-hidden="true"><use href="#i-zoomout"/></svg></button>
+          <button type="button" class="btn icon" id="zFit" title="Adatta alla finestra" aria-label="Adatta alla finestra"><svg class="ic" aria-hidden="true"><use href="#i-fit"/></svg></button>
+          <button type="button" class="btn icon" id="zIn" title="Ingrandisci" aria-label="Ingrandisci"><svg class="ic" aria-hidden="true"><use href="#i-zoomin"/></svg></button>
+          <button type="button" class="btn icon" id="zRot" title="Ruota di 180 gradi" aria-label="Ruota di 180 gradi" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-rot"/></svg></button>
+        </div>
+      </div>
+      <div class="viewswitch" id="viewSwitch" role="group" aria-label="Quale immagine mostrare" hidden>
+        <button type="button" class="seg" id="vPage" aria-pressed="false" hidden>Pagina dati</button>
+        <button type="button" class="seg" id="vFull" aria-pressed="true">Intera</button>
+        <button type="button" class="seg" id="vRaw" aria-pressed="false" hidden>Grezza</button>
+      </div>
+      <div class="viewer" id="viewer" tabindex="0" aria-label="Immagine scansionata, scorri con le frecce se ingrandita">
+        <div class="viewer-empty" id="viewerEmpty">
+          <svg class="ic xl" aria-hidden="true"><use href="#i-scan"/></svg>
+          <p>Nessuna immagine.<br>Scansiona un libretto o apri un'immagine già salvata.</p>
+        </div>
+        <img id="preview" alt="Immagine scansionata del libretto" hidden>
+      </div>
+      <p class="caption" id="caption"></p>
+      <div class="diag" id="diagBox" hidden aria-live="polite"></div>
+      <div class="prev-actions" id="prevActions" hidden>
+        <button type="button" class="btn primary" id="btnRead"><svg class="ic" aria-hidden="true"><use href="#i-open"/></svg><span>Leggi i dati</span></button>
+        <button type="button" class="btn" id="btnRescan"><svg class="ic" aria-hidden="true"><use href="#i-scan"/></svg><span>Riscansiona</span></button>
+        <button type="button" class="btn danger" id="btnDiscard"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg><span>Scarta</span></button>
+      </div>
+      <div class="strip-wrap" id="stripWrap" hidden>
+        <p class="strip-title">Ultime anteprime (non salvate)</p>
+        <ul class="strip" id="strip"></ul>
+      </div>
+    </div>
+
+    <div class="card" id="howCard">
+      <h2>Come inserire il libretto</h2>
+      <ol class="steps">
+        <li>Chiudi gli altri programmi che usano lo scanner (per esempio ScanTest).</li>
+        <li>Apri il libretto sulla pagina con la <strong>foto</strong>.</li>
+        <li>Inserisci <strong>per primo il bordo con le due righe MRZ</strong> (<code>&lt;&lt;&lt;&lt;</code>), faccia verso l'alto.</li>
+        <li>Libretto <strong>centrato, dritto e spinto fino in fondo</strong>, nell'apertura frontale. Uno alla volta.</li>
+        <li>Se si inceppa <strong>non tirare con forza</strong>: apri prima il coperchio dello scanner, poi estrai.</li>
+        <li>A fine scansione ritira il libretto.</li>
+      </ol>
+    </div>
+
+    <div class="card" id="histCard">
+      <h2>Ultime scansioni</h2>
+      <ul class="hist" id="history"><li class="muted">Nessuna scansione salvata.</li></ul>
+    </div>
+  </section>
+
+  <section class="col-right" aria-label="Dati e comandi">
+    <div class="card actions" id="actions">
+      <div class="scan-row">
+        <div class="field-inline">
+          <label for="scanName">Nome di riserva dei file</label>
+          <input id="scanName" type="text" maxlength="60" autocomplete="off" spellcheck="false" aria-describedby="scanNameHelp">
+          <span id="scanNameHelp" class="help">Si usa solo se mancano nome, cognome o numero libretto. Altrimenti i file si chiameranno <code>NOME - COGNOME - NUMERO</code>. Finché non confermi non si scrive nulla in <code>scans\</code>.</span>
+        </div>
+        <button type="button" class="btn primary big" id="btnScan"><svg class="ic" aria-hidden="true"><use href="#i-scan"/></svg><span id="btnScanText">Anteprima</span></button>
+      </div>
+      <p class="demo-note" id="demoNote" hidden></p>
+      <div class="open-row">
+        <div class="field-inline grow">
+          <label for="openSelect">Apri immagine già salvata</label>
+          <select id="openSelect"></select>
+        </div>
+        <button type="button" class="btn" id="btnOpen"><svg class="ic" aria-hidden="true"><use href="#i-open"/></svg><span>Apri</span></button>
+        <button type="button" class="btn" id="btnReread" disabled><svg class="ic" aria-hidden="true"><use href="#i-reread"/></svg><span>Rileggi</span></button>
+        <button type="button" class="btn" id="btnPdf" disabled><svg class="ic" aria-hidden="true"><use href="#i-pdf"/></svg><span>Esporta PDF (max 1 MB)</span></button>
+      </div>
+      <details class="settings" id="settings">
+        <summary>Impostazioni di scansione</summary>
+        <div class="settings-grid">
+          <div class="field-inline"><label for="setDriver">Driver dello scanner</label>
+            <select id="setDriver"><option value="wia">wia (consigliato per libretti veri)</option><option value="twain">twain (solo fogli stampati)</option></select></div>
+          <div class="field-inline"><label for="setDpi">Risoluzione (dpi)</label>
+            <input id="setDpi" type="number" min="75" max="600" step="1" inputmode="numeric"></div>
+          <div class="field-inline"><label for="setLen">Lunghezza letta (mm)</label>
+            <input id="setLen" type="number" min="30" max="356" step="1" inputmode="decimal" aria-describedby="lenHelp"></div>
+          <div class="field-inline"><label for="setTop">Margine sopra il titolo (mm)</label>
+            <input id="setTop" type="number" min="-1" max="20" step="0.5" inputmode="decimal"></div>
+        </div>
+        <p class="help" id="driverHelp">WIA: come <code>scan-wia.cmd</code>, l'immagine esce già dritta. TWAIN: consigliato solo per fogli stampati; per libretti veri usa WIA (con TWAIN l'immagine esce capovolta e il programma la ruota di 180 gradi).</p>
+        <p class="help" id="lenHelp">Con 190 mm la lettura copre la pagina dati sia se il punto di partenza è il bordo inserito per primo sia se è il bordo in mano (il libretto aperto è lungo circa 176 mm). Il driver è lo stesso di <code>scan-wia.cmd</code> (wia) o TWAIN. La scansione è sempre ruotata di 180 gradi (dritta) e ritagliata sul documento; la sola pagina dati si ricava dopo «Leggi i dati» (margine sopra la scritta: il valore qui sotto).</p>
+        <button type="button" class="btn small" id="setReset">Ripristina valori consigliati</button>
+      </details>
+    </div>
+
+    <div class="card job" id="jobPanel" hidden aria-live="polite">
+      <div class="job-head">
+        <span class="spinner" id="jobSpin" aria-hidden="true"></span>
+        <h2 id="jobTitle">Lavoro in corso</h2>
+        <span class="elapsed" id="jobElapsed"></span>
+      </div>
+      <p id="jobMsg" class="job-msg"></p>
+      <div class="bar" role="progressbar" aria-label="Lavoro in corso, durata non prevedibile" id="jobBar"><span></span></div>
+      <div class="job-foot">
+        <button type="button" class="btn danger" id="btnCancel">Annulla</button>
+        <span class="help" id="cancelHelp"></span>
+      </div>
+    </div>
+
+    <div class="card empty-state" id="emptyState">
+      <h2 id="emptyTitle">Nessun libretto letto</h2>
+      <p id="emptyText">Premi «Anteprima» con il libretto inserito: vedrai l'immagine prima di leggerla e salvarla. Oppure apri un'immagine già salvata.</p>
+      <p class="muted">I dati letti compariranno qui e potrai correggerli: il programma <strong>imparerà</strong> le tue correzioni per quel libretto.</p>
+    </div>
+
+    <div id="results" hidden>
+      <div class="card" id="warnCard" hidden>
+        <h2>Da sapere</h2>
+        <ul class="warns" id="warns"></ul>
+      </div>
+
+      <div class="card" id="fieldsCard" tabindex="-1">
+        <div class="card-head">
+          <h2>Dati del libretto</h2>
+          <p class="legend" id="legend" aria-hidden="true"></p>
+        </div>
+        <p class="memline" id="memLine" hidden></p>
+        <p class="nameline" id="nameLine" hidden aria-live="polite"></p>
+        <div class="keepbox" id="keepBox" hidden>
+          <label id="keepFullWrap" class="chk"><input type="checkbox" id="keepFull"> Conserva anche la scansione intera (<code>NOME (intera).png</code>)</label>
+          <label id="keepRawWrap" class="chk"><input type="checkbox" id="keepRaw"> Conserva anche la scansione grezza (<code>NOME (grezza).png</code>)</label>
+          <span class="help">Si salva sempre la sola pagina dati ritagliata (se trovata). Le altre sono per capire problemi di inserimento.</span>
+        </div>
+        <div class="table-wrap">
+          <table class="fields">
+            <caption class="sr">Campi letti dal libretto: modifica il valore se è sbagliato</caption>
+            <thead><tr><th scope="col">Campo stampato</th><th scope="col">Valore</th><th scope="col">Stato</th></tr></thead>
+            <tbody id="fieldsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="mrzCard">
+        <h2>Zona MRZ (le due righe in fondo alla pagina)</h2>
+        <div id="mrzNone" class="muted" hidden>MRZ non trovata.</div>
+        <div id="mrzBody">
+          <pre class="mrz" id="mrzLines" aria-label="Righe MRZ come lette"></pre>
+          <ul class="checks" id="mrzChecks"></ul>
+          <div id="mrzCorrWrap" hidden>
+            <h3>Correzioni applicate dal lettore</h3>
+            <ul class="corr" id="mrzCorr"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="savebar" id="savebar" hidden>
+  <div class="savebar-in">
+    <p id="saveInfo" class="save-info">Nessuna modifica.</p>
+    <div class="save-btns">
+      <button type="button" class="btn" id="btnSaveCorr">Salva correzioni</button>
+      <button type="button" class="btn primary" id="btnConfirm"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Conferma e salva</span></button>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlgAsk" aria-labelledby="askTitle">
+  <form method="dialog" class="dlg">
+    <h2 id="askTitle"></h2>
+    <div id="askBody" class="dlg-body"></div>
+    <div class="dlg-btns">
+      <button type="submit" class="btn" value="extra" id="askExtra" hidden></button>
+      <button type="submit" class="btn" value="no" id="askNo">Annulla</button>
+      <button type="submit" class="btn primary" value="yes" id="askYes">Continua</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgMem" aria-labelledby="memTitle" class="wide">
+  <div class="dlg">
+    <div class="card-head"><h2 id="memTitle">Libretti ricordati</h2>
+      <button type="button" class="btn icon" id="memClose" aria-label="Chiudi"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <p class="help">Qui ci sono le correzioni che hai fatto: quando lo stesso libretto viene scansionato di nuovo, i campi corretti si sistemano da soli. Il file <code>dati\memoria.json</code> contiene dati personali.</p>
+    <div id="memList" class="mem-list"></div>
+  </div>
+</dialog>
+
+</body>
+</html>

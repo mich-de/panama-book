@@ -1,0 +1,50 @@
+# --- Build artefacts (rebuild with `go build`) ---
+*.exe
+*.exe~
+*.test
+*.out
+*.prof
+
+# --- PERSONAL DATA: never commit ---
+# Scans, results, ground truth and everything the programs write at run time contain data of real people.
+scans/
+dati/
+_out/
+_da_eliminare/
+_publish/
+facsimili/
+debug/
+dbg*/
+*.log
+# JSON output saved next to the sources, images and PDFs produced by the programs
+/*.json
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.tif
+*.tiff
+*.pdf
+!docs/**/*.png
+!docs/**/*.pdf
+# backups made by the app when it replaces a ground-truth file
+*.prec-*
+
+# --- Proprietary vendor software (PaperStream IP drivers): download from PFU with drivers/Get-PaperStreamIP.cmd, never redistribute ---
+drivers/download/
+drivers/*.iso
+drivers/*.msi
+drivers/*.cab
+drivers/_*/
+
+# --- Temporary / editor ---
+tmp_*
+temp_*
+*.tmp
+*.bak
+*.old
+*.orig
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
