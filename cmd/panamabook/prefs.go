@@ -22,8 +22,9 @@ const (
 // prefsLangs sono le lingue dell'interfaccia: inglese (predefinita), spagnolo (lingua di Panama), italiano.
 var prefsLangs = map[string]bool{"en": true, "es": true, "it": true}
 
-// prefsKeys sono le chiavi accettate: lang (testo), scan (driver, dpi, lunghezza, margine) e copy (formato di copia).
-var prefsKeys = map[string]bool{"lang": true, "scan": true, "copy": true}
+// prefsKeys sono le chiavi accettate: lang (testo), scan (driver, dpi, lunghezza, margine), copy (formato di copia) e outdir
+// (cartella di output, testo: si cambia solo con /api/outdir, che la verifica).
+var prefsKeys = map[string]bool{"lang": true, "scan": true, "copy": true, "outdir": true}
 
 type prefsStore struct {
 	mu   sync.Mutex
@@ -72,6 +73,10 @@ func (p *prefsStore) merge(in map[string]any) (map[string]any, error) {
 			if l, ok := v.(string); !ok || !prefsLangs[l] {
 				return nil, fmt.Errorf("lingua non valida")
 			}
+		} else if k == "outdir" {
+			if _, ok := v.(string); !ok && v != nil {
+				return nil, fmt.Errorf("cartella di output non valida")
+			}
 		} else if _, ok := v.(map[string]any); !ok && v != nil {
 			return nil, fmt.Errorf("impostazione %q non valida", k)
 		}
@@ -111,6 +116,10 @@ func (p *prefsStore) merge(in map[string]any) (map[string]any, error) {
 func (a *App) hPrefsSet(w http.ResponseWriter, r *http.Request) {
 	var in map[string]any
 	if !readJSON(w, r, &in) {
+		return
+	}
+	if _, ok := in["outdir"]; ok { // la cartella di output si cambia solo da /api/outdir (verifica e crea la cartella)
+		writeErr(w, http.StatusBadRequest, "impostazioni", "impostazione non modificabile da qui: \"outdir\"")
 		return
 	}
 	out, err := a.prefs.merge(in)

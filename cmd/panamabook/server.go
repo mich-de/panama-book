@@ -26,7 +26,7 @@ import (
 //go:embed web
 var webFS embed.FS
 
-const version = "1.0.0"
+const version = "1.0.1"
 
 // Valori consigliati per la scansione del libretto (tools\scansiona.cmd).
 const (
@@ -50,8 +50,8 @@ type config struct {
 // App è il server locale con tutto il suo stato.
 type App struct {
 	cfg       config
-	scansDir  string
-	truthDir  string
+	outMu     sync.RWMutex
+	outRoot   string // cartella dove si salvano immagini, JSON e PDF (predefinita: scans\ accanto al programma, vedi outdir.go)
 	mem       *memoria.Archivio
 	prefs     *prefsStore
 	token     string
@@ -88,11 +88,12 @@ func newApp(cfg config) (*App, error) {
 		return nil, err
 	}
 	a := &App{
-		cfg: cfg, scansDir: filepath.Join(cfg.Base, "scans"), truthDir: filepath.Join(cfg.Base, "scans", "verita"),
+		cfg: cfg, outRoot: filepath.Join(cfg.Base, "scans"),
 		mem: mem, prefs: newPrefsStore(cfg.Base), token: randomHex(16), demoDelay: 1200 * time.Millisecond,
 		jobs: map[string]*Job{}, docs: map[string]*Doc{}, exitCh: make(chan struct{}),
 		allowedHosts: map[string]bool{}, allowedOrigins: map[string]bool{},
 	}
+	a.loadOutDir()
 	return a, nil
 }
 
@@ -140,6 +141,8 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("GET /", http.FileServerFS(sub))
 	mux.HandleFunc("GET /api/state", a.hState)
 	mux.HandleFunc("POST /api/prefs", a.hPrefsSet)
+	mux.HandleFunc("POST /api/outdir", a.hOutDir)
+	mux.HandleFunc("POST /api/outdir/pick", a.hOutDirPick)
 	mux.HandleFunc("POST /api/heartbeat", a.hHeartbeat)
 	mux.HandleFunc("POST /api/bye", a.hBye)
 	mux.HandleFunc("POST /api/clientlog", a.hClientLog)
@@ -254,7 +257,7 @@ func (a *App) hState(w http.ResponseWriter, r *http.Request) {
 		last = a.docView(lastDoc)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"last_doc": last, "prefs": a.prefs.load(),
+		"last_doc": last, "prefs": a.prefs.load(), "outdir": a.outView(),
 		"version": version, "demo": a.cfg.Demo != "", "demo_name": filepath.Base(a.cfg.Demo),
 		"defaults":      map[string]any{"driver": defDriver, "dpi": defDPI, "len_mm": defLenMM, "top_margin_mm": defTopMargin},
 		"suggested":     a.suggestName(),
@@ -363,7 +366,7 @@ func isImageName(n string) bool {
 }
 
 func (a *App) hScans(w http.ResponseWriter, r *http.Request) {
-	ents, err := os.ReadDir(a.scansDir)
+	ents, err := os.ReadDir(a.outDir())
 	items := []ScanItem{}
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		writeErr(w, http.StatusInternalServerError, "scans", "cartella scans non leggibile")
@@ -379,8 +382,8 @@ func (a *App) hScans(w http.ResponseWriter, r *http.Request) {
 		}
 		name := strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
 		it := ScanItem{File: e.Name(), Name: name, Time: info.ModTime().Format(time.RFC3339), Size: info.Size(), mod: info.ModTime()}
-		it.Saved = fileExists(filepath.Join(a.scansDir, name+".json"))
-		it.Truth = fileExists(filepath.Join(a.truthDir, name+".json"))
+		it.Saved = fileExists(filepath.Join(a.outDir(), name+".json"))
+		it.Truth = fileExists(filepath.Join(a.truthPath(), name+".json"))
 		items = append(items, it)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].mod.After(items[j].mod) })
@@ -397,7 +400,7 @@ func (a *App) safeScanFile(name string) (string, bool) {
 	if name == "" || name != filepath.Base(name) || strings.ContainsAny(name, `/\:`) || strings.HasPrefix(name, ".") || !isImageName(name) {
 		return "", false
 	}
-	p := filepath.Join(a.scansDir, name)
+	p := filepath.Join(a.outDir(), name)
 	if st, err := os.Stat(p); err != nil || st.IsDir() {
 		return "", false
 	}
@@ -428,7 +431,7 @@ func (a *App) hScan(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusFailedDependency, "manca_libretto", "Manca "+filepath.Base(a.cfg.Exe)+" accanto a PanamaBook.exe.")
 		return
 	}
-	if fileExists(filepath.Join(a.scansDir, s.Name+".png")) {
+	if fileExists(filepath.Join(a.outDir(), s.Name+".png")) {
 		writeErr(w, http.StatusConflict, "esiste", "Esiste già una scansione con questo nome: scegline un altro.")
 		return
 	}
@@ -551,13 +554,13 @@ func (a *App) docView(d *Doc) DocView {
 }
 
 func (a *App) jsonExists(name string) bool {
-	return fileExists(filepath.Join(a.scansDir, name+".json"))
+	return fileExists(filepath.Join(a.outDir(), name+".json"))
 }
 
 // suggestName propone il prossimo nome libero "libretto-NNN" (numero progressivo, nessun file con quel nome in scans).
 func (a *App) suggestName() string {
 	max := 0
-	ents, _ := os.ReadDir(a.scansDir)
+	ents, _ := os.ReadDir(a.outDir())
 	for _, e := range ents {
 		name := strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
 		if rest, ok := strings.CutPrefix(name, "libretto-"); ok && rest != "" {
@@ -576,8 +579,8 @@ func (a *App) suggestName() string {
 	}
 	for i := max + 1; ; i++ {
 		name := fmt.Sprintf("libretto-%03d", i)
-		if !fileExists(filepath.Join(a.scansDir, name+".png")) && !fileExists(filepath.Join(a.scansDir, name+".jpg")) &&
-			!fileExists(filepath.Join(a.scansDir, name+".json")) {
+		if !fileExists(filepath.Join(a.outDir(), name+".png")) && !fileExists(filepath.Join(a.outDir(), name+".jpg")) &&
+			!fileExists(filepath.Join(a.outDir(), name+".json")) {
 			return name
 		}
 	}

@@ -112,6 +112,19 @@ tabella, cioe' **con le tue correzioni** (non quello letto).
 - Se il browser nega l'accesso agli appunti il programma ripiega su `document.execCommand('copy')`; se fallisce anche quello mostra un
   messaggio chiaro ("seleziona il testo a mano e premi Ctrl+C").
 
+## Cartella di salvataggio
+
+Di norma immagini, JSON, PDF e la verita' (`verita\`) si salvano in `scans\` accanto al programma. In *Impostazioni > Cartella di salvataggio* si puo' scegliere
+un'altra cartella (un altro disco, una cartella condivisa o una cartella **OneDrive**): **Sfoglia...** apre la finestra di Windows, oppure si scrive il percorso
+completo e si preme **Applica** (o Invio). Se il PC ha OneDrive compare il pulsante **Usa OneDrive**, che sceglie `OneDrive\Panama Book`. **Predefinita** torna a `scans\`.
+
+- La cartella viene creata se manca e deve essere scrivibile; `dati\` (la cartella del programma) non e' ammessa. Non si cambia durante una scansione o una lettura.
+- La scelta e' nel file `dati\impostazioni.json` (chiave `outdir`) e si ritrova al riavvio. Se la cartella non c'e' piu' (disco tolto) il programma riparte
+  con `scans\` e lo scrive nel registro.
+- Cambiando cartella i file gia' salvati **non si spostano**: «Ultime scansioni» mostra la cartella attuale.
+- Anteprime (`dati\anteprima\`), memoria e profilo di Edge restano sempre accanto al programma.
+- Sono **dati personali**: in una cartella OneDrive vengono sincronizzati nel cloud (per un uso aziendale scegli una cartella consentita dalla policy).
+
 ## Impostazioni di scansione
 
 Valori consigliati gia' impostati, la ricetta collaudata di `tools\prova-libretto.cmd`: driver **`wia`**, **300 dpi**, lunghezza letta **190 mm**,

@@ -282,7 +282,7 @@ func (s *scanSettings) validateParams() error {
 }
 
 func (a *App) scanArgs(s scanSettings) []string {
-	return a.scanArgsTo(s, filepath.Join("scans", s.Name+".png"), "")
+	return a.scanArgsTo(s, a.relPath(dirScans, s.Name+".png"), "")
 }
 
 // scanArgsTo sono gli argomenti di "libretto.exe scan" con le impostazioni consigliate, scrivendo nel file rel (relativo alla cartella di lavoro).
@@ -304,8 +304,7 @@ func (a *App) scanArgsTo(s scanSettings, rel, raw string) []string {
 
 // doScan è il lavoro "Scansiona": scansione (o copia demo) e poi lettura dei dati.
 func (a *App) doScan(ctx context.Context, j *Job, s scanSettings) {
-	rel := filepath.Join("scans", s.Name+".png")
-	dst := filepath.Join(a.cfg.Base, rel)
+	dst := a.absPath(a.relPath(dirScans, s.Name+".png"))
 	j.set(phaseScanning, "Scansione in corso: lo scanner sta lavorando. Non toccare il libretto e attendi (circa 10 secondi).", false)
 	if a.cfg.Demo != "" {
 		j.set(phaseScanning, "PROVA (demo): nessuno scanner viene usato, si copia l'immagine di prova.", false)
@@ -318,7 +317,7 @@ func (a *App) doScan(ctx context.Context, j *Job, s scanSettings) {
 			return
 		}
 	} else {
-		_ = os.MkdirAll(a.scansDir, 0o700)
+		_ = os.MkdirAll(a.outDir(), 0o700)
 		// MAI ctx qui: durante il trasferimento fisico non si interrompe nulla.
 		_, code, err := a.runLibretto(context.Background(), a.scanArgs(s), j.addLog)
 		if err != nil || code != 0 {
@@ -392,7 +391,7 @@ func (a *App) doExtractIn(ctx context.Context, j *Job, dir, file string, topMarg
 // extract con -page-out (la sola pagina dati, 2 mm sopra la scritta REPUBLICA DE PANAMA, dritta, senza bianchi; libretto la salva
 // solo se trova le righe MRZ) e, se va bene, mette il JSON in cache. msg non vuoto = errore da mostrare.
 func (a *App) extractCached(ctx context.Context, j *Job, dir, file string, topMargin float64) (out []byte, msg string, cancelled bool) {
-	args := []string{"extract", "-i", relPath(dir, file)}
+	args := []string{"extract", "-i", a.relPath(dir, file)}
 	cache := ""
 	if dir == dirPreview {
 		cache = filepath.Join(a.previewDir(), readName(file))
@@ -404,7 +403,7 @@ func (a *App) extractCached(ctx context.Context, j *Job, dir, file string, topMa
 		}
 		pageFile := pageName(file)
 		_ = os.Remove(filepath.Join(a.previewDir(), pageFile))
-		args = append(args, "-page-out", relPath(dir, pageFile), "-top-margin", strconv.FormatFloat(topMargin, 'f', -1, 64), "-force")
+		args = append(args, "-page-out", a.relPath(dir, pageFile), "-top-margin", strconv.FormatFloat(topMargin, 'f', -1, 64), "-force")
 	}
 	out, code, err := a.runLibretto(ctx, args, j.addLog)
 	if ctx.Err() != nil {

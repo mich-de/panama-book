@@ -636,3 +636,7 @@ kbd { font: inherit; font-family: var(--mono); font-size: .85em; padding: 0 5px;
   #fieldsCard .valwrap .btn.icon { min-width: 32px; min-height: 32px; }
   #fieldsCard .fields tr { padding-top: 0; padding-bottom: 1px; }
 }
+
+/* cartella di salvataggio (Impostazioni) */
+.path-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.path-row input { flex: 1 1 260px; min-width: 0; }

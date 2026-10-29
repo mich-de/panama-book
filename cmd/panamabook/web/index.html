@@ -140,6 +140,13 @@
             <div class="field-inline"><label for="scanName">Nome di riserva dei file</label>
               <input id="scanName" type="text" maxlength="60" autocomplete="off" spellcheck="false" aria-describedby="scanNameHelp">
               <span id="scanNameHelp" class="help">Si usa solo se mancano nome, cognome o numero libretto. Altrimenti i file si chiameranno <code>NOME - COGNOME - NUMERO</code>. Finché non confermi non si scrive nulla in <code>scans\</code>.</span></div>
+            <div class="field-inline"><label for="outPath">Cartella di salvataggio</label>
+              <div class="path-row"><input id="outPath" type="text" maxlength="240" autocomplete="off" spellcheck="false" aria-describedby="outHelp">
+                <button type="button" class="btn small" id="btnOutPick">Sfoglia…</button>
+                <button type="button" class="btn small" id="btnOutApply">Applica</button>
+                <button type="button" class="btn small" id="btnOutDefault">Predefinita</button></div>
+              <div class="path-row" id="outOneDrive" hidden></div>
+              <span id="outHelp" class="help">Qui vanno immagini, JSON e PDF salvati (anche su un altro disco o in una cartella OneDrive). Cambiando cartella i file già salvati non si spostano. Sono dati personali: in una cartella OneDrive vengono sincronizzati nel cloud.</span></div>
             <div class="settings-grid">
               <div class="field-inline"><label for="setDriver">Driver dello scanner</label>
                 <select id="setDriver"><option value="wia">wia (consigliato per libretti veri)</option><option value="twain">twain (solo fogli stampati)</option></select></div>

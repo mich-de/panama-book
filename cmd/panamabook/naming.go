@@ -37,7 +37,7 @@ func (a *App) futureName(d *Doc, final map[string]string) (name string, ok bool)
 	if d.Name == base || (strings.HasPrefix(d.Name, base+" (") && strings.HasSuffix(d.Name, ")")) {
 		return d.Name, true
 	}
-	return filename.Unique(a.scansDir, base, scanExts...), true
+	return filename.Unique(a.outDir(), base, scanExts...), true
 }
 
 // renameAll rinomina old+ext in final+ext per ogni estensione presente; se un passo fallisce rimette a posto i precedenti.

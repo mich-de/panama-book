@@ -82,14 +82,6 @@ func (a *App) safeImage(dir, name string) (string, bool) {
 	return a.safeScanFile(name)
 }
 
-// relPath e' il percorso relativo alla cartella di lavoro (dove gira libretto.exe) dell'immagine.
-func relPath(dir, file string) string {
-	if dir == dirPreview {
-		return filepath.Join("dati", "anteprima", file)
-	}
-	return filepath.Join("scans", file)
-}
-
 func imageURL(dir, file string) string {
 	if dir == dirPreview {
 		return "/api/image?dir=preview&file=" + urlEscape(file)
@@ -274,7 +266,7 @@ func (a *App) doPreview(ctx context.Context, j *Job, s scanSettings) {
 	} else {
 		// MAI ctx qui: durante il trasferimento fisico non si interrompe nulla.
 		rawDst := filepath.Join(a.previewDir(), rawName(name))
-		_, code, err := a.runLibretto(context.Background(), a.scanArgsTo(s, relPath(dirPreview, name), relPath(dirPreview, rawName(name))), j.addLog)
+		_, code, err := a.runLibretto(context.Background(), a.scanArgsTo(s, a.relPath(dirPreview, name), a.relPath(dirPreview, rawName(name))), j.addLog)
 		if err != nil || code != 0 {
 			_ = os.Remove(dst) // un file a meta' non e' un'anteprima
 			_ = os.Remove(rawDst)
@@ -365,7 +357,7 @@ func (a *App) fallbackName(chosen string) string {
 	if !reName.MatchString(chosen) || strings.Contains(chosen, "..") {
 		chosen = a.suggestName()
 	}
-	return filename.Unique(a.scansDir, chosen, scanExts...)
+	return filename.Unique(a.outDir(), chosen, scanExts...)
 }
 
 // movePreview salva l'anteprima in scans\\ col nome definitivo, tutto o niente. Se la lettura ha prodotto la SOLA PAGINA DATI ritagliata
@@ -373,7 +365,7 @@ func (a *App) fallbackName(chosen string) string {
 // keepFull, la grezza come `NOME (grezza).png` solo con keepRaw. Senza pagina (MRZ non trovata) si salva l'anteprima cosi' com'e'.
 // Il PDF di anteprima, se c'e', segue con lo stesso nome base. Restituisce se e' stata usata la pagina dati.
 func (a *App) movePreview(d *Doc, newName string, keepRaw, keepFull, usePage bool) (usedPage bool, err error) {
-	if err := os.MkdirAll(a.scansDir, 0o700); err != nil {
+	if err := os.MkdirAll(a.outDir(), 0o700); err != nil {
 		return false, err
 	}
 	pv := a.previewDir()
@@ -392,15 +384,15 @@ func (a *App) movePreview(d *Doc, newName string, keepRaw, keepFull, usePage boo
 			_ = os.Rename(moved[i][1], moved[i][0])
 		}
 	}
-	steps := [][2]string{{main, filepath.Join(a.scansDir, newName+".png")}}
+	steps := [][2]string{{main, filepath.Join(a.outDir(), newName+".png")}}
 	if pdf := filepath.Join(pv, strings.TrimSuffix(d.File, ".png")+".pdf"); fileExists(pdf) {
-		steps = append(steps, [2]string{pdf, filepath.Join(a.scansDir, newName+".pdf")})
+		steps = append(steps, [2]string{pdf, filepath.Join(a.outDir(), newName+".pdf")})
 	}
 	if usedPage && keepFull {
-		steps = append(steps, [2]string{full, filepath.Join(a.scansDir, filename.Unique(a.scansDir, newName+" (intera)", ".png")+".png")})
+		steps = append(steps, [2]string{full, filepath.Join(a.outDir(), filename.Unique(a.outDir(), newName+" (intera)", ".png")+".png")})
 	}
 	if raw := filepath.Join(pv, rawName(d.File)); keepRaw && fileExists(raw) {
-		steps = append(steps, [2]string{raw, filepath.Join(a.scansDir, filename.Unique(a.scansDir, newName+" (grezza)", ".png")+".png")})
+		steps = append(steps, [2]string{raw, filepath.Join(a.outDir(), filename.Unique(a.outDir(), newName+" (grezza)", ".png")+".png")})
 	}
 	for _, st := range steps {
 		if err := moveFile(st[0], st[1]); err != nil {

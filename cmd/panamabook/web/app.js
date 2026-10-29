@@ -126,6 +126,31 @@
   function saveSettings() {
     savePrefs({ scan: { driver: $('setDriver').value, dpi: +$('setDpi').value, len_mm: +$('setLen').value, top_margin_mm: +$('setTop').value } });
   }
+  // cartella di salvataggio: si cambia con /api/outdir (il programma verifica e crea la cartella); non sta in /api/prefs
+  function renderOut(o) {
+    if (!o) return;
+    S.out = o; $('outPath').value = o.path;
+    const box = $('outOneDrive'); box.replaceChildren();
+    for (const d of o.onedrive || []) {
+      const dir = d + '\\Panama Book';
+      box.append(h('button', { type: 'button', class: 'btn small', title: dir, onclick: () => applyOut(dir) }, 'Usa OneDrive'));
+    }
+    box.hidden = !(o.onedrive || []).length;
+  }
+  async function applyOut(path) {
+    if (path === undefined) path = $('outPath').value;
+    try {
+      const r = await api('/api/outdir', { method: 'POST', body: { path } });
+      renderOut(r.outdir); refreshScans();
+      notify('ok', 'Cartella di salvataggio: ' + r.outdir.path);
+    } catch (e) { notify('error', e.message); if (S.out) $('outPath').value = S.out.path; }
+  }
+  async function pickOut() {
+    try {
+      const r = await api('/api/outdir/pick', { method: 'POST', body: {} });
+      if (r.path) applyOut(r.path);
+    } catch (e) { notify('error', e.message); }
+  }
   // lingua dell'interfaccia: inglese se non scelta; la pagina si traduce da sola (i18n.js)
   function loadLang() {
     const l = S.prefs.lang || window.PBI18n.lang;
@@ -1203,7 +1228,7 @@
     }
     if (!st.libretto_ok) notify('error', 'Manca ' + st.libretto_name + ' accanto a PanamaBook.exe: senza non si può scansionare né leggere.', { sticky: true });
     $('scanName').value = st.suggested || suggestedName();
-    loadSettings();
+    loadSettings(); renderOut(st.outdir);
     heartbeat(); setInterval(heartbeat, 5000);
     refreshScans(); refreshMemCount();
     await refreshPreviews();
@@ -1243,6 +1268,10 @@
     try { await api('/api/jobs/' + currentJob + '/cancel', { method: 'POST', body: {} }); } catch (e) { notify('error', e.message); }
   });
   $('setLang').addEventListener('change', () => { window.PBI18n.setLang($('setLang').value); savePrefs({ lang: $('setLang').value }); });
+  $('btnOutPick').addEventListener('click', pickOut);
+  $('btnOutApply').addEventListener('click', () => applyOut());
+  $('btnOutDefault').addEventListener('click', () => applyOut(''));
+  $('outPath').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); applyOut(); } });
   $('setReset').addEventListener('click', () => { applySettings(S.defaults); saveSettings(); notify('info', 'Impostazioni consigliate ripristinate.'); });
   for (const id of ['setDriver', 'setDpi', 'setLen', 'setTop']) $(id).addEventListener('change', () => { if (typeof readSettings() !== 'string') saveSettings(); });
   $('zIn').addEventListener('click', () => zoomBy(1));

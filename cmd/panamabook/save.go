@@ -167,8 +167,8 @@ func (a *App) hSave(w http.ResponseWriter, r *http.Request) {
 			msgs = append(msgs, "Mancano nome, cognome o numero libretto: i file restano col nome «"+d.Name+"».")
 		}
 	}
-	jsonPath := filepath.Join(a.scansDir, newName+".json")
-	truthPath := filepath.Join(a.truthDir, newName+".json")
+	jsonPath := filepath.Join(a.outDir(), newName+".json")
+	truthPath := filepath.Join(a.truthPath(), newName+".json")
 	if req.Mode == "confirm" && !req.Overwrite {
 		var existing []string
 		names := []string{newName}
@@ -176,10 +176,10 @@ func (a *App) hSave(w http.ResponseWriter, r *http.Request) {
 			names = append(names, d.Name) // anche i file di una conferma precedente di questo documento
 		}
 		for _, n := range names {
-			if fileExists(filepath.Join(a.truthDir, n+".json")) {
+			if fileExists(filepath.Join(a.truthPath(), n+".json")) {
 				existing = append(existing, filepath.Join("scans", "verita", n+".json"))
 			}
-			if fileExists(filepath.Join(a.scansDir, n+".json")) {
+			if fileExists(filepath.Join(a.outDir(), n+".json")) {
 				existing = append(existing, filepath.Join("scans", n+".json"))
 			}
 		}
@@ -291,11 +291,11 @@ func (a *App) hSave(w http.ResponseWriter, r *http.Request) {
 				msgs = append(msgs, "Salvata in scans la pagina intera come «"+newName+"».")
 			}
 		} else if newName != d.Name { // rinomina tutto-o-niente di .png/.jpg/.json/.pdf/.err; la verità già scritta per questo documento la segue
-			if err := renameAll(a.scansDir, d.Name, newName); err != nil {
+			if err := renameAll(a.outDir(), d.Name, newName); err != nil {
 				writeErr(w, http.StatusInternalServerError, "rinomina", "Rinomina dei file non riuscita (non è stato cambiato nulla): "+err.Error())
 				return
 			}
-			if oldTruth := filepath.Join(a.truthDir, d.Name+".json"); fileExists(oldTruth) && !fileExists(truthPath) {
+			if oldTruth := filepath.Join(a.truthPath(), d.Name+".json"); fileExists(oldTruth) && !fileExists(truthPath) {
 				_ = os.Rename(oldTruth, truthPath)
 			}
 			d.File, d.Name = newName+fileExt(d.File), newName
@@ -621,8 +621,8 @@ func (a *App) hPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimSuffix(req.File, filepath.Ext(req.File))
-	pdfRel := relPath(req.Dir, name+".pdf")
-	pdfAbs := filepath.Join(a.cfg.Base, pdfRel)
+	pdfRel := a.relPath(req.Dir, name+".pdf")
+	pdfAbs := a.absPath(pdfRel)
 	if fileExists(pdfAbs) && !req.Overwrite {
 		writeJSON(w, http.StatusConflict, map[string]any{"code": "esiste", "file": pdfRel,
 			"error": "Il PDF " + pdfRel + " esiste già: vuoi sostituirlo?"})
@@ -633,9 +633,9 @@ func (a *App) hPDF(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusFailedDependency, "manca_pdf", "Questa versione di libretto.exe non sa ancora creare il PDF (comando 'libretto pdf'), e _out\\libretto_pdf.exe non c'è.")
 		return
 	}
-	in := relPath(req.Dir, req.File)
+	in := a.relPath(req.Dir, req.File)
 	if req.Dir == dirPreview && (req.UsePage == nil || *req.UsePage) && fileExists(filepath.Join(a.previewDir(), pageName(req.File))) {
-		in = relPath(req.Dir, pageName(req.File)) // il PDF e' della sola pagina dati, come l'immagine che si salvera'
+		in = a.relPath(req.Dir, pageName(req.File)) // il PDF e' della sola pagina dati, come l'immagine che si salvera'
 	}
 	args := []string{"pdf", "-i", in, "-o", pdfRel}
 	if req.Overwrite {

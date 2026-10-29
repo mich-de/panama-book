@@ -56,7 +56,7 @@ func (a *App) cutAuto(ctx context.Context, j *Job, file string) (found bool, err
 			found = false
 		}
 	}
-	args := []string{"crop", "-i", relPath(dirPreview, rawName(file)), "-o", relPath(dirPreview, file), "-force"}
+	args := []string{"crop", "-i", a.relPath(dirPreview, rawName(file)), "-o", a.relPath(dirPreview, file), "-force"}
 	_, code, err := a.runLibretto(ctx, args, onLine)
 	if err != nil {
 		return false, err
@@ -86,7 +86,7 @@ func (a *App) hPreviewCropBox(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusNotFound, "file", "Immagine non trovata.")
 			return
 		}
-		dir, name = a.scansDir, a.scanCropSource(file)
+		dir, name = a.outDir(), a.scanCropSource(file)
 	} else {
 		if _, ok := a.safePreview(file); !ok {
 			writeErr(w, http.StatusNotFound, "file", "Anteprima non trovata.")
@@ -242,7 +242,7 @@ func isJPEG(file string) bool {
 
 // scanCropSource e' l'immagine da cui si taglia: l'originale se c'e', altrimenti l'immagine stessa.
 func (a *App) scanCropSource(file string) string {
-	if o := scanOriginal(file); fileExists(filepath.Join(a.scansDir, o)) {
+	if o := scanOriginal(file); fileExists(filepath.Join(a.outDir(), o)) {
 		return o
 	}
 	return file
@@ -267,9 +267,9 @@ func (a *App) cropScan(w http.ResponseWriter, req cropReq) {
 		return
 	}
 	// l'originale si conserva PRIMA di qualunque modifica
-	if !fileExists(filepath.Join(a.scansDir, req.File)) && fileExists(filepath.Join(a.scansDir, scanOriginal(req.File))) {
+	if !fileExists(filepath.Join(a.outDir(), req.File)) && fileExists(filepath.Join(a.outDir(), scanOriginal(req.File))) {
 		// l'immagine principale non c'e' piu': c'e' solo l'originale, da cui si taglia
-	} else if err := copyNew(filepath.Join(a.scansDir, req.File), filepath.Join(a.scansDir, scanOriginal(req.File))); err != nil && !strings.Contains(err.Error(), "esiste già") {
+	} else if err := copyNew(filepath.Join(a.outDir(), req.File), filepath.Join(a.outDir(), scanOriginal(req.File))); err != nil && !strings.Contains(err.Error(), "esiste già") {
 		writeErr(w, http.StatusInternalServerError, "originale", "Copia originale non conservata: "+err.Error())
 		return
 	}
@@ -286,8 +286,8 @@ func (a *App) cropScan(w http.ResponseWriter, req cropReq) {
 		}
 		writeJSON(w, http.StatusAccepted, map[string]string{"job": j.ID})
 	case "manual":
-		src := filepath.Join(a.scansDir, scanOriginal(req.File))
-		if err := cropManualFile(src, filepath.Join(a.scansDir, req.File), req); err != nil {
+		src := filepath.Join(a.outDir(), scanOriginal(req.File))
+		if err := cropManualFile(src, filepath.Join(a.outDir(), req.File), req); err != nil {
 			writeErr(w, http.StatusBadRequest, "taglio", err.Error())
 			return
 		}
@@ -304,9 +304,9 @@ func (a *App) doCropScanAuto(ctx context.Context, j *Job, file, docID string) {
 	out := file
 	if isJPEG(file) { // libretto2 scrive PNG: si taglia in un PNG temporaneo, poi si riscrive in JPEG
 		out = file + ".taglio.png"
-		defer os.Remove(filepath.Join(a.scansDir, out))
+		defer os.Remove(filepath.Join(a.outDir(), out))
 	}
-	args := []string{"crop", "-i", relPath(dirScans, scanOriginal(file)), "-o", relPath(dirScans, out), "-force"}
+	args := []string{"crop", "-i", a.relPath(dirScans, scanOriginal(file)), "-o", a.relPath(dirScans, out), "-force"}
 	found := true
 	_, code, err := a.runLibretto(ctx, args, func(l string) {
 		j.addLog(l)
@@ -323,7 +323,7 @@ func (a *App) doCropScanAuto(ctx context.Context, j *Job, file, docID string) {
 		return
 	}
 	if out != file {
-		if err := convertImage(filepath.Join(a.scansDir, out), filepath.Join(a.scansDir, file)); err != nil {
+		if err := convertImage(filepath.Join(a.outDir(), out), filepath.Join(a.outDir(), file)); err != nil {
 			j.finish(phaseError, "", "Il taglio automatico non è riuscito: "+err.Error()+". L'immagine non è stata cambiata.", "")
 			return
 		}

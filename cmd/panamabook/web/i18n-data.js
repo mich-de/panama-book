@@ -87,6 +87,23 @@ window.PBI18nData = (() => {
   x('Con 190 mm la lettura copre la pagina dati sia dal bordo inserito per primo sia da quello in mano (il libretto aperto è lungo circa 176 mm). La scansione è sempre ruotata di 180 gradi (dritta) e ritagliata sul documento.', 'With 190 mm the reading covers the data page whether it is the edge inserted first or the one held in your hand (the open book is about 176 mm long). The scan is always rotated 180 degrees (upright) and cropped to the document.', 'Con 190 mm la lectura cubre la página de datos tanto desde el borde que se inserta primero como desde el que se tiene en la mano (la libreta abierta mide unos 176 mm). El escaneo se gira siempre 180 grados (derecho) y se recorta al documento.');
   x('Ripristina valori consigliati', 'Restore recommended values', 'Restaurar valores recomendados');
   x('Impostazioni consigliate ripristinate.', 'Recommended settings restored.', 'Ajustes recomendados restaurados.');
+  x('Cartella di salvataggio', 'Save folder', 'Carpeta de guardado');
+  x('Sfoglia…', 'Browse…', 'Examinar…');
+  x('Applica', 'Apply', 'Aplicar');
+  x('Predefinita', 'Default', 'Predeterminada');
+  x('Usa OneDrive', 'Use OneDrive', 'Usar OneDrive');
+  x('Qui vanno immagini, JSON e PDF salvati (anche su un altro disco o in una cartella OneDrive). Cambiando cartella i file già salvati non si spostano. Sono dati personali: in una cartella OneDrive vengono sincronizzati nel cloud.',
+    'Saved images, JSON and PDF files go here (it can be another drive or a OneDrive folder). Changing the folder does not move files already saved. They are personal data: in a OneDrive folder they are synced to the cloud.',
+    'Aquí van las imágenes, JSON y PDF guardados (puede ser otro disco o una carpeta de OneDrive). Al cambiar de carpeta no se mueven los archivos ya guardados. Son datos personales: en una carpeta de OneDrive se sincronizan en la nube.');
+  p(/^Cartella di salvataggio: (.+)$/, 'Save folder: {1}', 'Carpeta de guardado: {1}');
+  x('serve un percorso completo, per esempio C:\\Documenti\\Libretti', 'a full path is needed, for example C:\\Documents\\Books', 'se necesita una ruta completa, por ejemplo C:\\Documentos\\Libretas');
+  x('la cartella dati\\ è del programma: scegline un\'altra', 'the dati\\ folder belongs to the program: choose another one', 'la carpeta dati\\ es del programa: elige otra');
+  x('cartella non indicata', 'no folder given', 'no se indicó ninguna carpeta');
+  x('percorso non valido', 'invalid path', 'ruta no válida');
+  p(/^non riesco a creare la cartella: (.+)$/, 'cannot create the folder: {1}', 'no puedo crear la carpeta: {1}');
+  p(/^non riesco a scrivere nella cartella: (.+)$/, 'cannot write to the folder: {1}', 'no puedo escribir en la carpeta: {1}');
+  x('C\'è una scansione o una lettura in corso: attendi la fine e riprova.', 'A scan or a reading is in progress: wait for it to finish and try again.', 'Hay un escaneo o una lectura en curso: espera a que termine e inténtalo de nuevo.');
+  x('Non riesco ad aprire la finestra di scelta: scrivi il percorso a mano.', 'Cannot open the folder window: type the path by hand.', 'No puedo abrir la ventana de selección: escribe la ruta a mano.');
   x('La risoluzione deve essere tra 75 e 600 dpi.', 'The resolution must be between 75 and 600 dpi.', 'La resolución debe estar entre 75 y 600 ppp.');
   x('La lunghezza letta deve essere tra 30 e 356 mm.', 'The length read must be between 30 and 356 mm.', 'La longitud leída debe estar entre 30 y 356 mm.');
   x('Il margine sopra il titolo deve essere tra -1 e 20 mm.', 'The margin above the title must be between -1 and 20 mm.', 'El margen sobre el título debe estar entre -1 y 20 mm.');
