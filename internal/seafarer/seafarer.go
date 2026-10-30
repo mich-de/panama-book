@@ -200,9 +200,18 @@ func compare(fields map[string]string, rec Record, pairs []Pair) []Check {
 			continue
 		}
 		c := Check{Key: p.Key, Read: r, Online: o}
-		if strings.HasPrefix(p.Key, "date_") {
+		switch {
+		case strings.HasPrefix(p.Key, "date_"):
 			c.OK = sameDate(r, o)
-		} else {
+		case p.Key == "capacity" && rec["regulation"] != "" && !strings.EqualFold(rec["regulation"], "N/A"):
+			// sul libretto il cargo e' stampato con la regola STCW («GMDSS GENERAL OPERATOR IV/2»), online sono due campi
+			// separati (Capacity «GMDSS GENERAL OPERATOR» e Regulation «IV/2»): vale uguale in entrambe le forme
+			full := strings.TrimSpace(o + " " + rec["regulation"])
+			c.OK = norm(r) == norm(o) || norm(r) == norm(full)
+			if !c.OK {
+				c.Online = full
+			}
+		default:
 			c.OK = norm(r) == norm(o)
 		}
 		out = append(out, c)

@@ -1,4 +1,4 @@
-// Comando libretto2 (versione 1.0.2): scansione di un foglio A4 con lo scanner Epson WorkForce DS-1630 e ritaglio
+// Comando libretto2 (versione 1.0.3): scansione di un foglio A4 con lo scanner Epson WorkForce DS-1630 e ritaglio
 // dell'intero passaporto aperto (informativa + pagina dati, 125x176 mm), come nei facsimili AMP di Panama.
 //
 //	libretto2 info                          diagnostica dello scanner (non scansiona)
@@ -105,7 +105,7 @@ func exitCode(err error) int {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `libretto2 1.0.2 - Epson DS-1630, passaporto intero (informativa + pagina dati)
+	fmt.Fprint(os.Stderr, `libretto2 1.0.3 - Epson DS-1630, passaporto intero (informativa + pagina dati)
 uso:
   libretto2 info  [-device DS-1630]
   libretto2 scan  [-o file.png] [-dpi 300] [-gray] [-margin 2] [-raw foglio.png] [-yes] [-force]

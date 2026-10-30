@@ -27,7 +27,7 @@ import (
 //go:embed web
 var webFS embed.FS
 
-const version = "1.0.2"
+const version = "1.0.3"
 
 // Valori consigliati per la scansione del libretto (tools\scansiona.cmd).
 const (
