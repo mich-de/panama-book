@@ -28,7 +28,7 @@ const (
 
 var errBusy = errors.New("un altro lavoro è ancora in corso")
 
-// Job è un lavoro asincrono: scansione e lettura, oppure solo lettura.
+// Job è un lavoro asincrono: scansione e lettura, oppure solo lettura (Kind "scan", "open" o "cert").
 type Job struct {
 	mu         sync.Mutex
 	ID         string
@@ -42,6 +42,7 @@ type Job struct {
 	Log        []string
 	DocID      string
 	Preview    *PreviewView // lavoro "Anteprima" finito: l'immagine temporanea creata
+	Cert       *CertView    // lavoro "cert" finito: il certificato letto
 	Err        string
 	cancel     context.CancelFunc
 	lg         *logger
@@ -61,6 +62,7 @@ type JobView struct {
 	Error      string       `json:"error,omitempty"`
 	Doc        *DocView     `json:"doc,omitempty"`
 	Preview    *PreviewView `json:"preview,omitempty"`
+	Cert       *CertView    `json:"cert,omitempty"`
 }
 
 func (j *Job) set(phase, msg string, cancelable bool) {
@@ -378,6 +380,7 @@ func (a *App) doExtractIn(ctx context.Context, j *Job, dir, file string, topMarg
 		return
 	}
 	d := newDoc(randomHex(6), file, out, o, a.mem)
+	d.applyAutocorr(a.rules)
 	d.Dir = dir
 	if dir == dirPreview && fileExists(filepath.Join(a.previewDir(), pageName(file))) {
 		d.PageFile = pageName(file)

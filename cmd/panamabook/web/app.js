@@ -665,7 +665,42 @@
     if (!keepEdits) { S.edits = {}; S.rev = {}; }
     $('emptyState').hidden = true; $('results').hidden = false; $('savebar').hidden = false;
     updateActions();
-    renderWarnings(); renderMemLine(); renderFields(); renderMRZ(); updateSave(); updateCounter(); refreshNameLine(true); renderKeep();
+    renderWarnings(); renderMemLine(); renderFields(); renderMRZ(); updateSave(); updateCounter(); refreshNameLine(true); renderKeep(); bookQrLoad();
+  }
+
+  // QR del libretto e controllo doppio con il servizio AMP (stessa logica dei certificati)
+  const BOOK_CHECK_LABEL = { seafarers_id: 'Id Marino', name: 'Nombres y apellidos', date_of_birth: 'Fecha de nacimiento', nationality: 'Nacionalidad', id_number: 'Identificación', seamans_book: 'Libreta de embarque', sex: 'Sexo', capacity: 'Cargo', level: 'Nivel', date_of_issue: 'Fecha de emisión', date_of_expiry: 'Fecha de expiración' };
+  let bookLink = ''; // link usato per il controllo online (dal QR, oppure costruito dal campo «Nº Título», che e' il Doc Number)
+  async function bookQrLoad() {
+    $('bookQR').hidden = true; $('bookChecks').textContent = ''; bookLink = ''; if (!S.doc) return;
+    const id = S.doc.doc_id || S.doc.id;
+    let r = { qr: '', qr_amp: false };
+    try { r = await api('/api/doc/' + id + '/qr'); } catch (_) { /* si prova con il campo Nº Título */ }
+    if (!S.doc || (S.doc.doc_id || S.doc.id) !== id) return;
+    let src = 'QR';
+    if (r.qr_amp) bookLink = r.qr;
+    else {
+      const num = (currentValues().certificate || '').trim(); // il «Nº Título» del libretto e' il numero del documento nel servizio AMP
+      if (/^\d{9}$/.test(num)) { bookLink = 'http://190.34.205.206:8080/ords/seafarersgm/seafarers/idid/' + num; src = 'Nº Título'; }
+    }
+    $('bookQR').hidden = false;
+    $('bookQRText').value = bookLink || r.qr || '';
+    $('bookQRText').closest('.mfield').hidden = !$('bookQRText').value;
+    $('btnBookVerify').hidden = !bookLink; $('bookVerifyNote').hidden = !bookLink; $('bookQRNone').hidden = !!bookLink;
+    $('bookQRText').title = bookLink ? 'Link letto dal ' + src : '';
+  }
+  async function bookVerify() {
+    if (!S.doc) return;
+    const btn = $('btnBookVerify'); btn.disabled = true; $('bookChecks').textContent = '';
+    try {
+      const r = await api('/api/doc/' + S.doc.doc_id + '/verify', { method: 'POST', body: { fields: currentValues(), link: bookLink } });
+      const ul = $('bookChecks');
+      for (const c of r.checks || []) ul.append(h('li', {}, h('span', { class: c.ok ? 'ok' : 'diff' }, c.ok ? '✓' : '✗'), h('span', {}, BOOK_CHECK_LABEL[c.key] || c.key),
+        h('span', { class: 'val no-i18n' }, c.read), h('span', { class: 'val no-i18n' }, c.ok ? '' : 'online: ' + c.online)));
+      const stOk = /^valid$/i.test(r.status || '');
+      ul.append(h('li', { class: 'sum' }, (r.all_ok ? 'Tutti i campi controllati combaciano con il servizio AMP.' : 'Ci sono differenze con il servizio AMP: controlla i campi.') + ' Stato online: ',
+        h('span', { class: (stOk ? 'ok' : 'diff') + ' no-i18n' }, r.status || '(non indicato)')));
+    } catch (e) { notify('error', e.message); } finally { btn.disabled = false; }
   }
 
   // contatore "N campi da controllare" nella testata
@@ -753,7 +788,7 @@
     }
     return { st: f.status, text: f.status_text, dirty: false };
   }
-  const STATUS_ICON = { ok: 'check', check: 'warn', reviewed: 'check', empty: 'dash', memory: 'mem', edited: 'pen' };
+  const STATUS_ICON = { ok: 'check', check: 'warn', reviewed: 'check', empty: 'dash', memory: 'mem', auto: 'mem', edited: 'pen' };
 
   function fillRow(tr, f) {
     const r = rowState(f);
@@ -774,6 +809,9 @@
     if (r.st === 'memory') {
       note.append(h('span', {}, 'Letto: ', h('span', { class: 'was' }, f.mem_read || '(vuoto)'), ', corretto da te il ' + f.mem_date),
         h('button', { type: 'button', class: 'btn link', onclick: () => forgetField(f.key) }, 'Era giusto, dimentica'));
+    } else if (r.st === 'auto') {
+      note.append(h('span', {}, 'Letto: ', h('span', { class: 'was' }, f.mem_read || '(vuoto)'), ', autocorretto'),
+        h('button', { type: 'button', class: 'btn link', onclick: () => setEdit(f, f.mem_read, true) }, 'Rimetti il valore letto'));
     } else if (r.st === 'edited') {
       note.append(h('span', {}, 'Letto: ', h('span', { class: 'was' }, f.read || '(vuoto)')));
       if (r.dirty) note.append(h('button', { type: 'button', class: 'btn link', onclick: () => setEdit(f, f.value, true) }, 'Annulla modifica'));
@@ -1229,12 +1267,89 @@
     if (!st.libretto_ok) notify('error', 'Manca ' + st.libretto_name + ' accanto a PanamaBook.exe: senza non si può scansionare né leggere.', { sticky: true });
     $('scanName').value = st.suggested || suggestedName();
     loadSettings(); renderOut(st.outdir);
+    $('setNews').checked = !(S.prefs.news && S.prefs.news.enabled === false);
     heartbeat(); setInterval(heartbeat, 5000);
     refreshScans(); refreshMemCount();
     await refreshPreviews();
     if (st.busy_job) watchJob(st.busy_job);
     else if (st.last_doc) { showImage(st.last_doc); setDoc(st.last_doc, false); }
     else if (S.previews.length) { showFile(S.previews[0]); clearDoc(); }
+  }
+
+  // ---- schede Autocorrezioni e Novità di Panama ----------------------------------------------------------------------------------
+  const TABS = { book: ['tabBook', 'bookView'], cert: ['tabCert', 'certView'], ac: ['tabAc', 'acView'], news: ['tabNews', 'newsView'] };
+  const NEWS = { loaded: false, busy: false };
+  function showTab(name) {
+    for (const [k, [tab, view]] of Object.entries(TABS)) {
+      const on = k === name;
+      $(view).hidden = !on; $(tab).setAttribute('aria-selected', String(on)); $(tab).tabIndex = on ? 0 : -1;
+    }
+    $('savebar').classList.toggle('tab-off', name !== 'book'); // la barra «Salva» e' del libretto
+    if (name === 'ac') loadAutocorr();
+    if (name === 'news' && !NEWS.loaded) loadNews(false);
+  }
+  function fmtDate(iso) { const d = new Date(iso); return isNaN(d) || d.getFullYear() < 2000 ? '' : d.toLocaleDateString(window.PBI18n.locale(), { day: '2-digit', month: 'short', year: 'numeric' }); }
+
+  const AC = { fields: [], label: {} };
+  async function loadAutocorr() {
+    let r;
+    try { r = await api('/api/autocorr'); } catch (e) { $('acStatus').textContent = e.message; return; }
+    renderAutocorr(r);
+  }
+  function renderAutocorr(r) {
+    AC.fields = r.fields || []; AC.label = Object.fromEntries(AC.fields.map((f) => [f.key, f.es + ' / ' + f.en]));
+    const sel = $('acField'); const keep = sel.value;
+    sel.replaceChildren(...AC.fields.map((f) => h('option', { value: f.key, class: 'no-i18n' }, AC.label[f.key])));
+    if (keep) sel.value = keep;
+    const rules = r.rules || [];
+    $('acEmpty').hidden = rules.length > 0; $('acTable').hidden = rules.length === 0;
+    $('acStatus').textContent = rules.length ? rules.length + ' / ' + r.max : '';
+    $('acBody').replaceChildren(...rules.map((x) => {
+      const cb = h('input', { type: 'checkbox', 'aria-label': 'Attiva: ' + x.letto + ' → ' + x.corretto });
+      cb.checked = x.attiva;
+      cb.addEventListener('change', () => acPost({ action: 'toggle', field: x.campo, read: x.letto, on: cb.checked }));
+      const del = h('button', { type: 'button', class: 'btn small danger' }, 'Cancella');
+      let armed = null;
+      del.addEventListener('click', () => {
+        if (armed) { clearTimeout(armed); acPost({ action: 'delete', field: x.campo, read: x.letto }); return; }
+        del.textContent = 'Sicuro?';
+        armed = setTimeout(() => { armed = null; del.textContent = 'Cancella'; }, 3000);
+      });
+      return h('tr', { class: x.attiva ? '' : 'off' },
+        h('td', { class: 'no-i18n' }, AC.label[x.campo] || x.campo),
+        h('td', { class: 'val no-i18n' }, x.letto), h('td', { class: 'val no-i18n' }, x.corretto),
+        h('td', { title: x.ultimo_uso ? fmtDate(x.ultimo_uso) : '' }, String(x.usi)),
+        h('td', {}, x.origine === 'manuale' ? 'Scritta a mano' : 'Imparata'),
+        h('td', {}, cb), h('td', {}, del));
+    }));
+  }
+  async function acPost(body) {
+    try { renderAutocorr(await api('/api/autocorr', { method: 'POST', body })); } catch (e) { notify('error', e.message); loadAutocorr(); }
+  }
+
+  async function loadNews(refresh) {
+    if (NEWS.busy) return;
+    NEWS.busy = true; $('btnNewsRefresh').disabled = true;
+    $('newsStatus').textContent = 'Lettura delle novità in corso…';
+    let r;
+    try { r = await api('/api/news' + (refresh ? '?refresh=1' : '')); } catch (e) { $('newsStatus').textContent = e.message; NEWS.busy = false; $('btnNewsRefresh').disabled = false; return; }
+    NEWS.busy = false; $('btnNewsRefresh').disabled = false; NEWS.loaded = true;
+    $('newsOff').hidden = r.enabled; $('btnNewsRefresh').hidden = !r.enabled;
+    const list = $('newsList'); list.replaceChildren();
+    if (!r.enabled) { $('newsStatus').textContent = ''; return; }
+    const names = Object.fromEntries((r.sources || []).map((x) => [x.id, x.name]));
+    for (const it of r.items || []) {
+      const title = it.link && /^https:\/\//.test(it.link)
+        ? h('a', { href: it.link, target: '_blank', rel: 'noopener noreferrer' }, it.title) : document.createTextNode(it.title);
+      list.append(h('li', { class: 'news-item' },
+        h('div', { class: 'news-meta' }, h('span', { class: 'news-lang', title: it.lang === 'es' ? 'Español' : 'English' }, it.lang.toUpperCase()), h('span', {}, names[it.source] || it.source), h('span', {}, fmtDate(it.date))),
+        h('h3', {}, title), it.summary ? h('p', {}, it.summary) : null));
+    }
+    const failed = (r.failed || []).map((f) => (names[f.source] || f.source) + ': ' + f.error);
+    const when = r.fetched_at && new Date(r.fetched_at).getFullYear() > 2000 ? new Date(r.fetched_at).toLocaleString(window.PBI18n.locale(), { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    let msg = !(r.items || []).length ? 'Nessuna novità disponibile.' : 'Ultimo aggiornamento: ' + when + '.';
+    if (failed.length) msg += ' Non letto (' + failed.join('; ') + '): si mostra l\'ultima lettura riuscita.';
+    $('newsStatus').textContent = msg;
   }
 
   // ---- collegamenti -----------------------------------------------------------------------------------------------
@@ -1262,6 +1377,214 @@
   });
   $('btnSaveCorr').addEventListener('click', () => save('corrections'));
   $('btnConfirm').addEventListener('click', () => save('confirm'));
+  for (const [k, [tab]] of Object.entries(TABS)) $(tab).addEventListener('click', () => showTab(k));
+  $('tabs').addEventListener('keydown', (ev) => { // frecce sinistra/destra tra le schede
+    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+    const keys = Object.keys(TABS); const cur = keys.findIndex((k) => $(TABS[k][0]).getAttribute('aria-selected') === 'true');
+    const next = keys[(cur + (ev.key === 'ArrowRight' ? 1 : keys.length - 1)) % keys.length];
+    showTab(next); $(TABS[next][0]).focus(); ev.preventDefault();
+  });
+
+  // ---- scheda Certificati (SAT, SD, SSO, CT) ------------------------------------------------------------------
+  const CERT = { cur: null, vals: {}, busy: false, zoom: 1, blob: null };
+  function certZoom(z) { CERT.zoom = Math.min(5, Math.max(1, z)); $('certImg').style.width = (CERT.zoom * 100) + '%'; $('certImg').classList.toggle('zoomed', CERT.zoom > 1); }
+  // ruota l'immagine di 90 gradi disegnandola su una tela (l'originale non cambia): il PNG ruotato si mostra come blob
+  function certRotate() {
+    const img = $('certImg'); if (!img.naturalWidth) return;
+    const cv = document.createElement('canvas'); cv.width = img.naturalHeight; cv.height = img.naturalWidth;
+    const g = cv.getContext('2d'); g.translate(cv.width, 0); g.rotate(Math.PI / 2); g.drawImage(img, 0, 0);
+    cv.toBlob((b) => { if (!b) return; if (CERT.blob) URL.revokeObjectURL(CERT.blob); CERT.blob = URL.createObjectURL(b); img.src = CERT.blob; certZoom(1); }, 'image/png');
+  }
+  function certBusy(on, msg) {
+    CERT.busy = on; $('certSpin').hidden = !on; $('btnCertOpen').disabled = on; $('btnCertScan').disabled = on;
+    $('certLoading').hidden = !on; if (on) $('certResult').hidden = true;
+    if (msg !== undefined) { $('certStatus').textContent = msg; $('certLoadingText').textContent = on ? msg : ''; }
+  }
+  function certReset() {
+    CERT.cur = null; CERT.vals = {}; $('certResult').hidden = true; $('certFoot').hidden = true; certZoom(1); $('certImg').removeAttribute('src'); $('certPdf').removeAttribute('src'); $('certView').classList.remove('has-cert'); $('certFields').textContent = '';
+  }
+  function certRender() {
+    const c = CERT.cur; if (!c) return;
+    const typ = $('certType').value; const box = $('certFields'); box.textContent = '';
+    for (const r of c.layouts[typ] || []) {
+      const wrap = document.createElement('div'); wrap.className = 'mfield' + (r.required && !CERT.vals[r.key] ? ' miss' : '');
+      const lab = document.createElement('label'); lab.htmlFor = 'cf-' + r.key;
+      lab.append(r.es + ' / ' + r.en + (r.required ? ' *' : ''));
+      const inp = document.createElement('input'); inp.type = 'text'; inp.id = 'cf-' + r.key; inp.maxLength = r.key === 'course' ? 300 : 80; inp.spellcheck = false; inp.value = CERT.vals[r.key] || '';
+      inp.addEventListener('input', () => { CERT.vals[r.key] = inp.value; wrap.classList.toggle('miss', r.required && !inp.value.trim()); });
+      const cb = h('button', { type: 'button', class: 'btn icon copy', title: 'Copia «' + r.es + ' / ' + r.en + '»', 'aria-label': 'Copia ' + r.es + ' / ' + r.en,
+        onclick: () => doCopy(inp.value.trim(), cb, r.en + ': ' + inp.value.trim(), r.en + ': il campo è vuoto, niente da copiare.') }, icon('copy'));
+      wrap.append(lab, h('div', { class: 'mrow' }, inp, cb)); box.append(wrap);
+    }
+    const w = $('certWarn'); w.textContent = '';
+    for (const t of c.warnings || []) { const li = document.createElement('li'); li.textContent = t; w.append(li); }
+  }
+  function certShow(c) {
+    CERT.cur = c; CERT.vals = { ...c.fields }; $('certInfo').textContent = c.name || '';
+    const src = '/api/cert/image?id=' + c.id + '&t=' + encodeURIComponent(TOKEN);
+    const pdf = c.media === 'pdf'; // un PDF si mostra com'e' (il lettore di Edge ha il suo zoom); un'immagine con i nostri pulsanti
+    $('certImg').hidden = pdf; $('certPdf').hidden = !pdf; $('certZoombar').hidden = pdf; $('certPdfHelp').hidden = !pdf; $('certView').classList.add('has-cert');
+    if (pdf) $('certPdf').src = src + '#toolbar=1&navpanes=0&view=FitH'; else $('certImg').src = src;
+    $('certType').value = c.type;
+    $('certResult').hidden = false; $('certFoot').hidden = false; certZoom(1); certRender(); certQrShow(c);
+  }
+  const CHECK_LABEL = { marine_id: 'ID del Marino / Marine ID', name: 'Nombre / Name', date_of_birth: 'Fecha de nacimiento', nationality: 'Nacionalidad', identification: 'Identificación', date_of_issue: 'Fecha de expedición', date_of_expiry: 'Fecha de expiración' };
+  function certQrShow(c) {
+    $('certQR').hidden = !c.qr; $('certQRText').value = c.qr || '';
+    $('btnCertVerify').hidden = !c.qr_amp; $('certVerifyNote').hidden = !c.qr_amp; $('certChecks').textContent = '';
+  }
+  function certFieldsNow() {
+    const typ = $('certType').value; const lay = CERT.cur ? (CERT.cur.layouts[typ] || []) : [];
+    const keep = new Set(lay.map((r) => r.key).concat(['nationality_es', 'capacity_es']));
+    const fields = {}; for (const [k, v] of Object.entries(CERT.vals)) if (keep.has(k) && String(v).trim()) fields[k] = String(v).trim();
+    return fields;
+  }
+  async function certVerify() {
+    if (!CERT.cur) return;
+    const btn = $('btnCertVerify'); btn.disabled = true; $('certChecks').textContent = '';
+    try {
+      const r = await api('/api/cert/verify', { method: 'POST', body: { id: CERT.cur.id, type: $('certType').value, fields: certFieldsNow() } });
+      const ul = $('certChecks');
+      for (const c of r.checks || []) ul.append(h('li', {}, h('span', { class: c.ok ? 'ok' : 'diff' }, c.ok ? '✓' : '✗'), h('span', {}, CHECK_LABEL[c.key] || c.key),
+        h('span', { class: 'val no-i18n' }, c.read), h('span', { class: 'val no-i18n' }, c.ok ? '' : 'online: ' + c.online)));
+      const stOk = /^valid$/i.test(r.status || '');
+      ul.append(h('li', { class: 'sum' }, (r.all_ok ? 'Tutti i campi controllati combaciano con il servizio AMP.' : 'Ci sono differenze con il servizio AMP: controlla i campi.') + ' Stato online: ',
+        h('span', { class: (stOk ? 'ok' : 'diff') + ' no-i18n' }, r.status || '(non indicato)')));
+    } catch (e) { notify('error', e.message); } finally { btn.disabled = false; }
+  }
+  $('btnCertVerify').addEventListener('click', certVerify);
+  // «Cerca sul sito AMP»: il sito di verifica dell'AMP vuole nome, data di nascita (GG-MES-AAAA) e Marine ID. La sessione del sito
+  // nasce nel browser e non si puo' preparare da qui: si mostrano i tre valori da copiare e si apre il sito.
+  const AMP_URL = 'http://190.34.205.206:8080/ords/f?p=100';
+  const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  function ampDate(d) { // GG-MM-AAAA -> GG-MES-AAAA
+    const m = /^(\d{2})[-/.](\d{2})[-/.](\d{4})$/.exec((d || '').trim());
+    return m && +m[2] >= 1 && +m[2] <= 12 ? m[1] + '-' + MONTHS[+m[2] - 1] + '-' + m[3] : (d || '').trim();
+  }
+  let ampCtx = { kind: 'cert', fields: {}, docNumber: '' };
+  function ampOpenDialog(name, dob, marine, docNo, ctx) {
+    ampCtx = ctx || { kind: 'cert', fields: {}, docNumber: '' };
+    $('ampName').value = (name || '').trim(); $('ampDob').value = ampDate(dob); $('ampMarine').value = (marine || '').trim();
+    $('ampDoc').value = (docNo || '').trim(); $('ampDoc').closest('.mfield').hidden = !$('ampDoc').value;
+    $('ampResult').hidden = true; $('ampResult').textContent = '';
+    $('ampNoDob').hidden = !!$('ampDob').value;
+    $('dlgAmp').showModal();
+  }
+  for (const [id, src] of [['ampCopyName', 'ampName'], ['ampCopyDob', 'ampDob'], ['ampCopyMarine', 'ampMarine'], ['ampCopyDoc', 'ampDoc']]) {
+    $(id).addEventListener('click', () => doCopy($(src).value.trim(), $(id), $(src).previousElementSibling ? $(src).closest('.mfield').querySelector('label').textContent : '', 'Il campo è vuoto, niente da copiare.'));
+  }
+  function qrDocNumber(link) { const m = /\/idid\/(\d{1,12})$/.exec(link || ''); return m ? m[1] : ''; }
+  // ricerca automatica per Marine ID sul sito AMP (stesso percorso del sito: apre la sessione, invia nome + nascita + Marine ID)
+  const AMP_CHECK_LABEL = Object.assign({}, CHECK_LABEL, BOOK_CHECK_LABEL);
+  async function ampAuto() {
+    const btn = $('ampAuto'); const box = $('ampResult'); btn.disabled = true; box.hidden = false; box.textContent = '';
+    box.append(h('p', { class: 'help' }, 'Ricerca sul sito AMP in corso (alcuni secondi)…'));
+    try {
+      const r = await api('/api/amp/search', { method: 'POST', body: { name: $('ampName').value, birth: $('ampDob').value, marine_id: $('ampMarine').value.trim(), kind: ampCtx.kind, fields: ampCtx.fields, doc_number: ampCtx.docNumber } });
+      box.textContent = '';
+      box.append(h('p', { class: 'sum' }, 'Trovato sul sito AMP: ' + r.person.name + ' (Marine ID ' + r.person.marine_id + '), ' + (r.docs || []).length + ' documenti.'));
+      const ul = h('ul', { class: 'cert-checks' });
+      for (const c of r.checks || []) ul.append(h('li', {}, h('span', { class: c.ok ? 'ok' : 'diff' }, c.ok ? '✓' : '✗'), h('span', {}, AMP_CHECK_LABEL[c.key] || c.key),
+        h('span', { class: 'val no-i18n' }, c.read), h('span', { class: 'val no-i18n' }, c.ok ? '' : 'online: ' + c.online)));
+      box.append(ul);
+      if (r.match) box.append(h('p', { class: 'sum' }, 'Il documento ' + r.match.doc_number + ' è nell\'elenco: ' + r.match.doc_type + ', ' + r.match.capacity + ', stato ', h('span', { class: (/^valid$/i.test(r.match.status) ? 'ok' : 'diff') + ' no-i18n' }, r.match.status), ', scade il ' + r.match.date_of_expiry + '.'));
+      else if (ampCtx.docNumber) box.append(h('p', { class: 'help' }, 'Il documento ' + ampCtx.docNumber + ' non è tra quelli mostrati: il sito elenca solo CT, libretti e titoli' + (r.more ? ', 15 per pagina (questa è solo la prima)' : '') + '; i corsi (SAT, SD, SSO) non compaiono.'));
+      const docs = h('ul', { class: 'cert-checks amp-docs no-i18n' });
+      for (const d of r.docs || []) docs.append(h('li', { class: d.doc_number === ampCtx.docNumber ? 'sum' : '' }, h('span', {}, ''), h('span', {}, d.doc_number + ' ' + d.doc_type), h('span', { class: 'val' }, d.capacity + ' · ' + d.status), h('span', { class: 'val' }, (d.date_of_issue || '?') + ' → ' + (d.date_of_expiry || '?'))));
+      box.append(docs);
+    } catch (e) { box.textContent = ''; box.append(h('p', { class: 'diff' }, e.message)); } finally { btn.disabled = false; }
+  }
+  $('ampAuto').addEventListener('click', ampAuto);
+  $('ampClose').addEventListener('click', () => $('dlgAmp').close());
+  $('ampOpen').addEventListener('click', () => { window.open(AMP_URL, '_blank', 'noopener'); });
+  $('btnCertAmp').addEventListener('click', () => {
+    const f = certFieldsNow();
+    ampOpenDialog(f.name, f.date_of_birth, f.marine_id, f.document_number, { kind: 'cert', fields: f, docNumber: qrDocNumber($('certQRText').value) });
+  });
+  $('btnBookAmp').addEventListener('click', () => {
+    if (!S.doc) { notify('info', 'Apri prima un libretto.'); return; }
+    const v = currentValues();
+    ampOpenDialog([v.given_names, v.surname].filter(Boolean).join(' '), v.date_of_birth, v.seafarers_id, v.certificate, { kind: 'book', fields: v, docNumber: (v.certificate || '').trim() || qrDocNumber(bookLink) });
+  });
+
+  $('btnBookVerify').addEventListener('click', bookVerify);
+  $('btnBookQRCopy').addEventListener('click', () => doCopy($('bookQRText').value, $('btnBookQRCopy'), 'link del QR', 'Nessun link da copiare.'));
+  $('btnCertQRCopy').addEventListener('click', () => doCopy($('certQRText').value, $('btnCertQRCopy'), 'link del QR', 'Nessun link da copiare.'));
+  $('btnCertCopyAll').addEventListener('click', () => {
+    const typ = $('certType').value; const f = certFieldsNow();
+    const text = (CERT.cur.layouts[typ] || []).filter((r) => f[r.key]).map((r) => r.en + ': ' + f[r.key]).join('\n');
+    doCopy(text, $('btnCertCopyAll'), 'tutti i campi del certificato', 'Tutti i campi sono vuoti: niente da copiare.');
+  });
+  async function certFollow(jobID) {
+    for (;;) {
+      let j; try { j = await api('/api/jobs/' + jobID); } catch (e) { certBusy(false, e.message); return; }
+      if (!j.done) { $('certStatus').textContent = $('certLoadingText').textContent = j.message || 'Lettura in corso…'; await new Promise((r) => setTimeout(r, 700)); continue; }
+      if (j.phase === 'done' && j.cert) { certBusy(false, j.message || ''); certShow(j.cert); }
+      else { certBusy(false, ''); notify(j.phase === 'cancelled' ? 'info' : 'error', j.error || j.message || 'Lettura non riuscita.'); }
+      return;
+    }
+  }
+  async function certUpload(file) {
+    if (!file || CERT.busy) return;
+    certReset(); certBusy(true, 'Invio del file…');
+    try {
+      const r = await fetch('/api/cert/upload?name=' + encodeURIComponent(file.name), { method: 'POST', headers: { 'X-PB-Token': TOKEN, 'Content-Type': 'application/octet-stream' }, body: file });
+      const d = await r.json().catch(() => null);
+      if (!r.ok) throw new Error((d && d.error) || ('Errore ' + r.status));
+      await certFollow(d.job);
+    } catch (e) { certBusy(false, ''); notify('error', e.message); }
+  }
+  $('btnCertOpen').addEventListener('click', () => { $('certFile').value = ''; $('certFile').click(); });
+  $('certFile').addEventListener('change', () => certUpload($('certFile').files[0]));
+  $('btnCertScan').addEventListener('click', async () => {
+    if (CERT.busy) return;
+    certReset(); certBusy(true, 'Scansione in corso: lo scanner sta lavorando. Attendi.');
+    try { const d = await api('/api/cert/scan', { method: 'POST', body: {} }); await certFollow(d.job); } catch (e) { certBusy(false, ''); notify('error', e.message); }
+  });
+  $('certType').addEventListener('change', certRender);
+  $('certZin').addEventListener('click', () => certZoom(CERT.zoom + 0.5));
+  $('certZout').addEventListener('click', () => certZoom(CERT.zoom - 0.5));
+  $('certFit').addEventListener('click', () => { certZoom(1); $('certImgBox').scrollTo(0, 0); });
+  $('certRot').addEventListener('click', certRotate);
+  $('certImg').addEventListener('dblclick', (ev) => { // doppio clic: ingrandisce verso quel punto, o torna a «adatta»
+    const box = $('certImgBox'); const r = $('certImg').getBoundingClientRect();
+    const fx = (ev.clientX - r.left) / r.width, fy = (ev.clientY - r.top) / r.height;
+    if (CERT.zoom > 1) { certZoom(1); box.scrollTo(0, 0); return; }
+    certZoom(2.5); const n = $('certImg').getBoundingClientRect();
+    box.scrollTo(fx * n.width - box.clientWidth / 2, fy * n.height - box.clientHeight / 2);
+  });
+  $('btnCertDiscard').addEventListener('click', async () => {
+    if (CERT.cur) { try { await api('/api/cert/discard', { method: 'POST', body: { id: CERT.cur.id } }); } catch (_) { /* il file di lavoro si cancella da solo */ } }
+    certReset(); $('certStatus').textContent = '';
+  });
+  $('certForm').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!CERT.cur) return;
+    const typ = $('certType').value; const lay = CERT.cur.layouts[typ] || [];
+    const keep = new Set(lay.map((r) => r.key).concat(['nationality_es', 'capacity_es']));
+    const fields = {}; for (const [k, v] of Object.entries(CERT.vals)) if (keep.has(k) && String(v).trim()) fields[k] = String(v).trim();
+    const miss = lay.filter((r) => r.required && !fields[r.key]);
+    if (miss.length && !confirm('Mancano ' + miss.length + ' campi richiesti (' + miss.map((r) => r.en).join(', ') + '). Salvare lo stesso?')) return;
+    try {
+      const r = await api('/api/cert/save', { method: 'POST', body: { id: CERT.cur.id, type: typ, fields } });
+      notify('ok', 'Salvato: ' + r.dir + '\\' + r.json);
+      certReset(); $('certStatus').textContent = 'Salvato «' + r.json + '». Puoi leggere un altro certificato.';
+    } catch (e) { notify('error', e.message); }
+  });
+  $('btnAcImport').addEventListener('click', async () => {
+    try {
+      const r = await api('/api/autocorr', { method: 'POST', body: { action: 'import' } });
+      renderAutocorr(r); const i = r.import || {};
+      notify(i.added ? 'ok' : 'info', 'Importate ' + i.added + ' autocorrezioni dalla memoria (' + i.skipped + ' già presenti o non valide, ' + i.ambiguous + ' ambigue).');
+    } catch (e) { notify('error', e.message); }
+  });
+  $('acForm').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const body = { action: 'add', field: $('acField').value, read: $('acRead').value, fixed: $('acFixed').value };
+    try { renderAutocorr(await api('/api/autocorr', { method: 'POST', body })); $('acRead').value = ''; $('acFixed').value = ''; $('acRead').focus(); } catch (e) { notify('error', e.message); }
+  });
+  $('btnNewsRefresh').addEventListener('click', () => loadNews(true));
+  $('setNews').addEventListener('change', () => { savePrefs({ news: { enabled: $('setNews').checked } }); NEWS.loaded = false; });
   $('btnMem').addEventListener('click', () => { renderMemory(); $('dlgMem').showModal(); });
   $('memClose').addEventListener('click', () => $('dlgMem').close());
   $('btnCancel').addEventListener('click', async () => {

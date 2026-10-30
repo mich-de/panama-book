@@ -41,6 +41,12 @@
     <span class="sub">Libreta de embarque</span>
     <small class="author">Autore: Michele De Angelis · <a href="mailto:mic.deangelis@gmail.com">mic.deangelis@gmail.com</a></small>
   </div>
+  <nav class="tabs" role="tablist" aria-label="Sezioni" id="tabs">
+    <button type="button" class="tab" role="tab" id="tabBook" aria-selected="true" aria-controls="bookView">Libretto</button>
+    <button type="button" class="tab" role="tab" id="tabCert" aria-selected="false" aria-controls="certView" tabindex="-1">Certificati</button>
+    <button type="button" class="tab" role="tab" id="tabAc" aria-selected="false" aria-controls="acView" tabindex="-1">Autocorrezioni</button>
+    <button type="button" class="tab" role="tab" id="tabNews" aria-selected="false" aria-controls="newsView" tabindex="-1">Novità di Panama</button>
+  </nav>
   <div class="top-actions">
     <span id="demoBadge" class="badge-demo" hidden>PROVA: nessuno scanner</span>
     <button type="button" class="review-pill" id="reviewPill" hidden aria-live="polite"><svg class="ic" aria-hidden="true"><use href="#i-warn"/></svg><span id="reviewPillText"></span></button>
@@ -55,7 +61,7 @@
 
 <div class="loupe" id="loupe" hidden aria-hidden="true"></div>
 
-<main class="layout">
+<main class="layout" id="bookView" role="tabpanel" aria-labelledby="tabBook">
   <section class="col-left" aria-label="Immagine">
     <div class="card" id="previewCard">
       <div class="card-head">
@@ -147,6 +153,8 @@
                 <button type="button" class="btn small" id="btnOutDefault">Predefinita</button></div>
               <div class="path-row" id="outOneDrive" hidden></div>
               <span id="outHelp" class="help">Qui vanno immagini, JSON e PDF salvati (anche su un altro disco o in una cartella OneDrive). Cambiando cartella i file già salvati non si spostano. Sono dati personali: in una cartella OneDrive vengono sincronizzati nel cloud.</span></div>
+            <div class="field-inline"><label class="check"><input type="checkbox" id="setNews" checked> Leggi le novità ufficiali di Panama da Internet (scheda «Novità di Panama»)</label>
+              <span class="help">Solo quando apri la scheda o premi «Aggiorna». Spegnila se la rete dell'azienda non lo consente.</span></div>
             <div class="settings-grid">
               <div class="field-inline"><label for="setDriver">Driver dello scanner</label>
                 <select id="setDriver"><option value="wia">wia (consigliato per libretti veri)</option><option value="twain">twain (solo fogli stampati)</option></select></div>
@@ -192,6 +200,7 @@
       <div class="card" id="fieldsCard" tabindex="-1">
         <div class="card-head">
           <h2 title="Campi vuoti: compilali se sul libretto ci sono, altrimenti vanno bene vuoti.">Dati del libretto</h2>
+          <button type="button" class="btn small" id="btnBookAmp" title="Apre il sito ufficiale dell'AMP con nome, data di nascita e Marine ID pronti da incollare">Cerca sul sito AMP</button>
           <p class="legend" id="legend" aria-hidden="true"></p>
           <div class="copybar" id="copyBar" role="group" aria-label="Copia i campi negli appunti">
             <label class="sr" for="copyFormat">Formato</label><select id="copyFormat" title="Formato della copia"></select>
@@ -217,6 +226,16 @@
         </div>
       </div>
 
+      <div class="card cert-qr" id="bookQR" hidden>
+        <div class="mfield"><label for="bookQRText">Codice QR del libretto (link al servizio di verifica dell'AMP)</label>
+          <div class="mrow"><input id="bookQRText" type="text" readonly spellcheck="false">
+            <button type="button" class="btn icon copy" id="btnBookQRCopy" title="Copia il link" aria-label="Copia il link"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button></div></div>
+        <div class="cert-verify-row"><button type="button" class="btn" id="btnBookVerify">Verifica online (controllo doppio)</button>
+          <span class="help" id="bookVerifyNote">Interroga il servizio pubblico dell'AMP (collegamento non cifrato): invia solo il numero che sta nel QR, nessun tuo dato.</span></div>
+        <p class="help" id="bookQRNone" hidden>Il QR non si legge da questa immagine (serve una scansione nitida, a 300 dpi) e il campo «Nº Título» non ha un numero valido: il controllo online non è disponibile. Puoi comunque usare «Cerca sul sito AMP».</p>
+        <ul class="cert-checks" id="bookChecks"></ul>
+      </div>
+
       <div class="card" id="mrzCard">
         <div id="mrzNone" class="muted" hidden>MRZ non trovata.</div>
         <div id="mrzBody" class="mrzgrid">
@@ -239,6 +258,103 @@
   </section>
 </main>
 
+<section class="panel" id="certView" role="tabpanel" aria-labelledby="tabCert" hidden>
+  <div class="panel-inner">
+    <div class="shell-head">
+      <h2>Certificati di Panama</h2>
+      <p class="help" id="certStatus" aria-live="polite"></p>
+    </div>
+    <p class="help cert-help">Legge i certificati SAT (Security Awareness), SD (Security Duties), SSO (Ship Security Officer) e CT (Certificación de Trámite de Título: la ricevuta che serve per ottenere il libretto definitivo). Scegli un PDF o un'immagine, oppure scansiona un foglio A4; controlla i campi e salva: il file JSON e una copia del certificato vanno nella cartella «certificati» dentro la cartella di salvataggio.</p>
+    <div class="cert-actions">
+      <input type="file" id="certFile" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" hidden>
+      <button type="button" class="btn primary" id="btnCertOpen">Apri PDF o immagine…</button>
+      <button type="button" class="btn" id="btnCertScan">Scansiona un foglio A4</button>
+      <span class="spinner sm" id="certSpin" hidden aria-hidden="true"></span>
+    </div>
+    <div class="cert-loading" id="certLoading" hidden role="status" aria-live="polite">
+      <div class="cl-head"><span class="spinner xl" aria-hidden="true"></span><div><p class="cl-title">Sto caricando il documento…</p><p class="help" id="certLoadingText"></p></div></div>
+      <div class="cl-skel" aria-hidden="true"><div class="cl-doc"></div><div class="cl-fields"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    </div>
+    <div class="shell-body" id="certResult" hidden>
+      <div class="shell-doc">
+        <div class="shell-img" id="certImgBox"><img id="certImg" alt="Il certificato letto"><iframe id="certPdf" title="Il certificato letto" hidden></iframe></div>
+        <div class="zoombar" id="certZoombar">
+          <button type="button" class="btn icon" id="certZout" title="Riduci" aria-label="Riduci"><svg class="ic" aria-hidden="true"><use href="#i-zoomout"/></svg></button>
+          <button type="button" class="btn icon" id="certFit" title="Adatta alla finestra" aria-label="Adatta alla finestra"><svg class="ic" aria-hidden="true"><use href="#i-fit"/></svg></button>
+          <button type="button" class="btn icon" id="certZin" title="Ingrandisci (anche doppio clic sull'immagine)" aria-label="Ingrandisci"><svg class="ic" aria-hidden="true"><use href="#i-zoomin"/></svg></button>
+          <button type="button" class="btn icon" id="certRot" title="Ruota di 90 gradi" aria-label="Ruota di 90 gradi"><svg class="ic" aria-hidden="true"><use href="#i-rot"/></svg></button>
+        </div>
+        <p class="help" id="certPdfHelp" hidden>Per il PDF usa i comandi del visualizzatore in alto (zoom, adatta, ruota, stampa).</p>
+      </div>
+      <form class="cert-form" id="certForm" autocomplete="off">
+        <div class="mfield"><label for="certType">Tipo di certificato</label>
+          <select id="certType">
+            <option value="SAT">SAT - Security Awareness Training</option>
+            <option value="SD">SD - Security Duties</option>
+            <option value="SSO">SSO - Ship Security Officer</option>
+            <option value="CT">CT - Certificación de Trámite (per il libretto definitivo)</option>
+          </select></div>
+        <div class="cert-fields no-i18n" id="certFields"></div>
+        <ul class="cert-warn" id="certWarn"></ul>
+        <div class="cert-verify-row"><button type="button" class="btn" id="btnCertAmp">Cerca sul sito AMP</button></div>
+        <div class="cert-qr" id="certQR" hidden>
+          <div class="mfield"><label for="certQRText">Codice QR del certificato (link al servizio di verifica dell'AMP)</label>
+            <div class="mrow"><input id="certQRText" type="text" readonly spellcheck="false">
+              <button type="button" class="btn icon copy" id="btnCertQRCopy" title="Copia il link" aria-label="Copia il link"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button></div></div>
+          <div class="cert-verify-row"><button type="button" class="btn" id="btnCertVerify">Verifica online (controllo doppio)</button>
+            <span class="help" id="certVerifyNote">Interroga il servizio pubblico dell'AMP (collegamento non cifrato): invia solo il numero che sta nel QR, nessun tuo dato.</span></div>
+          <ul class="cert-checks" id="certChecks"></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="shell-foot" id="certFoot" hidden>
+    <p class="shell-info" id="certInfo"></p>
+    <div class="shell-btns">
+      <button type="button" class="btn" id="btnCertCopyAll"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><span>Copia tutti i campi</span></button>
+      <button type="button" class="btn" id="btnCertDiscard">Scarta</button>
+      <button type="submit" class="btn primary" id="btnCertSave" form="certForm">Salva</button>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="acView" role="tabpanel" aria-labelledby="tabAc" hidden>
+  <div class="panel-inner">
+    <div class="panel-head shell-head">
+      <h2>Autocorrezioni</h2>
+      <p class="help" id="acStatus" aria-live="polite"></p>
+      <button type="button" class="btn small" id="btnAcImport" title="Crea le autocorrezioni dalle correzioni già ricordate per i singoli libretti (scheda Memoria)">Importa dalla memoria</button>
+    </div>
+    <p class="help">Quando correggi un campo il programma impara: la volta dopo, su qualsiasi libretto, se legge lo stesso valore lo corregge da solo e lo segna «Autocorretto». Vale solo per tipo, paese, nazionalità, luogo di nascita, livello, qualifica e regional (mai per nomi, numeri o date) e solo sul valore intero. L'elenco è nel file dati\autocorrezioni.json.</p>
+    <form class="ac-add mforms" id="acForm" autocomplete="off">
+      <div class="field-inline"><label for="acField">Campo</label><select id="acField"></select></div>
+      <div class="field-inline"><label for="acRead">Se legge</label><input id="acRead" type="text" maxlength="60" spellcheck="false" required></div>
+      <div class="field-inline"><label for="acFixed">Corregge in</label><input id="acFixed" type="text" maxlength="60" spellcheck="false" required></div>
+      <button type="submit" class="btn primary" id="acAdd">Aggiungi</button>
+    </form>
+    <div class="ac-wrap">
+      <table class="ac-table" id="acTable">
+        <thead><tr><th scope="col">Campo</th><th scope="col">Se legge</th><th scope="col">Corregge in</th><th scope="col">Usi</th><th scope="col">Origine</th><th scope="col">Attiva</th><th scope="col"><span class="sr">Cancella</span></th></tr></thead>
+        <tbody id="acBody"></tbody>
+      </table>
+    </div>
+    <p class="help" id="acEmpty" hidden>Nessuna autocorrezione ancora. Correggi un campo e premi «Salva correzioni»: comparirà qui.</p>
+  </div>
+</section>
+
+<section class="panel" id="newsView" role="tabpanel" aria-labelledby="tabNews" hidden>
+  <div class="panel-inner">
+    <div class="panel-head shell-head">
+      <h2>Novità ufficiali di Panama</h2>
+      <p class="help" id="newsStatus" aria-live="polite"></p>
+      <button type="button" class="btn small" id="btnNewsRefresh">Aggiorna</button>
+    </div>
+    <p class="help" id="newsOff" hidden>La lettura delle novità è spenta nelle Impostazioni: il programma non contatta nessun sito.</p>
+    <ul class="news-list no-i18n" id="newsList"></ul>
+    <p class="help">Fonti ufficiali: Autoridad Marítima de Panamá (amp.gob.pa), notizie in spagnolo; Panama Ship Registry (panamashipregistry.com), che è dell'AMP, notizie in inglese. Le notizie non sono tradotte. Il programma non invia nessun dato dei libretti: legge solo i loro feed pubblici.</p>
+  </div>
+</section>
+
 <div class="savebar" id="savebar" hidden>
   <div class="savebar-in">
     <p id="saveInfo" class="save-info" aria-live="polite">Nessuna modifica.</p>
@@ -249,6 +365,23 @@
     </div>
   </div>
 </div>
+
+<dialog id="dlgAmp" aria-labelledby="ampTitle">
+  <div class="dlg">
+    <div class="card-head"><h2 id="ampTitle">Cerca sul sito AMP</h2>
+      <button type="button" class="btn icon" id="ampClose" aria-label="Chiudi"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <p class="help">Il sito ufficiale dell'AMP (verifica dei marittimi) vuole nome, data di nascita e Marine ID. Premi «Apri il sito AMP», poi «Search», scegli «Marine Id» e incolla questi tre valori. Il sito usa un collegamento non cifrato (HTTP).</p>
+    <div class="amp-fields no-i18n">
+      <div class="mfield"><label for="ampName">Name</label><div class="mrow"><input id="ampName" type="text" spellcheck="false"><button type="button" class="btn icon copy" id="ampCopyName" aria-label="Copia il nome" title="Copia il nome"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button></div></div>
+      <div class="mfield"><label for="ampDob">Date Of Birth (DD-MON-YYYY)</label><div class="mrow"><input id="ampDob" type="text" spellcheck="false" placeholder="24-OCT-1992"><button type="button" class="btn icon copy" id="ampCopyDob" aria-label="Copia la data di nascita" title="Copia la data di nascita"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button></div></div>
+      <div class="mfield"><label for="ampDoc">Nº Documento / Document No.</label><div class="mrow"><input id="ampDoc" type="text" spellcheck="false"><button type="button" class="btn icon copy" id="ampCopyDoc" aria-label="Copia il numero del documento" title="Copia il numero del documento"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button></div></div>
+      <div class="mfield"><label for="ampMarine">Marine ID</label><div class="mrow"><input id="ampMarine" type="text" spellcheck="false" inputmode="numeric"><button type="button" class="btn icon copy" id="ampCopyMarine" aria-label="Copia il Marine ID" title="Copia il Marine ID"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button></div></div>
+    </div>
+    <p class="help" id="ampNoDob" hidden>Questo documento non riporta la data di nascita: scrivila qui sopra.</p>
+    <div class="amp-btns"><button type="button" class="btn" id="ampAuto" title="Cerca per Marine ID sul sito AMP e confronta i dati (nome, nascita, Marine ID e numero del documento vengono inviati al sito, in HTTP non cifrato)">Cerca per Marine ID (automatico)</button><button type="button" class="btn primary" id="ampOpen">Apri il sito AMP</button></div>
+    <div class="amp-result" id="ampResult" hidden aria-live="polite"></div>
+  </div>
+</dialog>
 
 <dialog id="dlgHelp" aria-labelledby="helpTitle">
   <div class="dlg">

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"scanlibretto/internal/autocorr"
 	"scanlibretto/internal/memoria"
 	"scanlibretto/internal/mrz"
 )
@@ -131,7 +132,10 @@ type Doc struct {
 	Read     map[string]string // valori letti dal programma
 	Initial  map[string]string // valori mostrati all'inizio (dopo la memoria) o all'ultimo salvataggio
 	Applied  map[string]memoria.Correzione
-	Key      string // chiave d'identita' del libretto ("" se l'MRZ non è valida)
+	Auto     map[string]autoInfo // campi corretti dalle autocorrezioni GLOBALI (autocorr.go): valore letto e valore messo
+	Key      string              // chiave d'identita' del libretto ("" se l'MRZ non è valida)
+	QR       string              // testo del QR della pagina dati (bookqr.go); qrDone dice che si e' gia' cercato
+	qrDone   bool
 	When     time.Time
 
 	Issues    map[string][]string         // motivi per cui un campo è da controllare, ricavati dagli avvisi del lettore
@@ -155,6 +159,28 @@ func (d *Doc) reasons(def fieldDef, v string) []string {
 		r = append(r, "l'ultima volta era stato confermato «"+prev+"»")
 	}
 	return r
+}
+
+// autoInfo e' una autocorrezione globale applicata a un campo.
+type autoInfo struct{ Read, Fixed string }
+
+// applyAutocorr applica le autocorrezioni globali ai campi che la memoria del libretto non ha gia' corretto. Vale con o senza
+// MRZ valida (non identifica nessun libretto) e solo per i campi di autocorr.Campi. Non scrive nulla su disco.
+func (d *Doc) applyAutocorr(r *autocorr.Archivio) {
+	d.Auto = map[string]autoInfo{}
+	if r == nil {
+		return
+	}
+	for _, f := range fieldDefs {
+		read := d.Read[f.Key]
+		if read == "" || d.Initial[f.Key] != read {
+			continue // vuoto, oppure gia' corretto dalla memoria di questo libretto (che ha la precedenza)
+		}
+		if rule, ok := r.Cerca(f.Key, read); ok {
+			d.Initial[f.Key] = rule.Corretto
+			d.Auto[f.Key] = autoInfo{Read: read, Fixed: rule.Corretto}
+		}
+	}
 }
 
 // newDoc costruisce il documento e applica la memoria (solo con MRZ valida).
@@ -442,6 +468,8 @@ func (d *Doc) view(mem *memoria.Archivio, savedJSON bool) DocView {
 			fv.Extra = "ISO " + o.Fields["nationality_iso"]
 		}
 		applied, isApplied := d.Applied[f.Key]
+		auto, isAuto := d.Auto[f.Key]
+		isAuto = isAuto && !isApplied && fv.Value == auto.Fixed
 		// il Nº Título / Certificate c'è solo su alcuni libretti: se non è stato letto e il lettore non lo dichiara mancante, la riga non si mostra
 		if f.Key == "certificate" && fv.Value == "" && d.Read[f.Key] == "" && !isApplied && !d.NotRead[f.Key] && len(d.reasons(f, "")) == 0 {
 			continue
@@ -451,6 +479,9 @@ func (d *Doc) view(mem *memoria.Archivio, savedJSON bool) DocView {
 			fv.Status, fv.StatusText = "memory", "Corretto da memoria"
 			fv.MemRead = d.Read[f.Key] // quello che il programma ha letto questa volta
 			fv.MemDate = applied.Data.Format("2006-01-02")
+		case isAuto:
+			fv.Status, fv.StatusText = "auto", "Autocorretto"
+			fv.MemRead = auto.Read // quello che il programma ha letto questa volta
 		case fv.Value != d.Read[f.Key]:
 			fv.Status, fv.StatusText = "edited", "Modificato da te"
 		case len(d.reasons(f, fv.Value)) > 0:

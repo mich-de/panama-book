@@ -358,6 +358,35 @@ func isNationalityAdjective(n string) bool {
 	return false
 }
 
+// CorrectNationality ripara un aggettivo di nazionalita' letto male dall'OCR («CREEK» -> «GREEK»): se e' gia' un aggettivo della
+// tabella lo restituisce com'e'; se differisce da UNO SOLO degli aggettivi per una lettera (sostituita, aggiunta o tolta) restituisce
+// quello; altrimenti (sconosciuto o ambiguo) restituisce false e il testo non si tocca.
+func CorrectNationality(s string) (string, bool) {
+	n := Norm(s)
+	if n == "" {
+		return s, false
+	}
+	var found string
+	for _, adjs := range nationalityAdjectives {
+		for _, a := range adjs {
+			na := Norm(a)
+			if na == n {
+				return a, true
+			}
+			if sub, ins, del := editOps([]rune(n), []rune(na)); sub+ins+del == 1 && len(n) >= 5 {
+				if found != "" && found != a {
+					return s, false // due aggettivi possibili: non si indovina
+				}
+				found = a
+			}
+		}
+	}
+	if found == "" {
+		return s, false
+	}
+	return found, true
+}
+
 // mrz confronta la zona visiva con l'MRZ trovato.
 func (c *checker) mrz() {
 	if !c.sum.HasMRZ {

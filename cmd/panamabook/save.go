@@ -65,7 +65,7 @@ type reviewItem struct {
 
 type correction struct {
 	Field  string `json:"field"`
-	Source string `json:"source"` // "user" | "memory"
+	Source string `json:"source"` // "user" | "memory" | "autocorr"
 	Read   string `json:"read"`
 }
 
@@ -103,6 +103,9 @@ func (a *App) hSave(w http.ResponseWriter, r *http.Request) {
 		src := "user"
 		if ap, ok := d.Applied[f.Key]; ok && ap.Corretto == final[f.Key] {
 			src = "memory"
+		}
+		if ai, ok := d.Auto[f.Key]; ok && ai.Fixed == final[f.Key] {
+			src = "autocorr" // messo dalle autocorrezioni globali e lasciato dall'operatore: non e' una correzione sua da ricordare per il libretto
 		}
 		corr = append(corr, correction{Field: f.Key, Source: src, Read: d.Read[f.Key]})
 	}
@@ -328,8 +331,15 @@ func (a *App) hSave(w http.ResponseWriter, r *http.Request) {
 		msgs = append(msgs, "Salvati scans\\"+d.Name+".json e la verità per la regressione (scans\\verita\\"+d.Name+".json).")
 	}
 
+	a.updateRules(d, final, req.Mode, &msgs)
+
 	// nuovo stato di riferimento: quello salvato
 	d.Initial = final
+	for f, ai := range d.Auto { // un'autocorrezione resta segnata solo finche' il campo ha ancora il valore messo da lei
+		if final[f] != ai.Fixed {
+			delete(d.Auto, f)
+		}
+	}
 	d.Applied = map[string]memoria.Correzione{}
 	d.Reviewed = map[string]string{}
 	for _, r := range reviewed {
@@ -378,6 +388,8 @@ func buildTruth(final map[string]string, corr []correction, open []string) []byt
 		}
 		if c.Source == "memory" {
 			notes[c.Field] = "corretto dalla memoria di PanamaBook e confermato dall'operatore"
+		} else if c.Source == "autocorr" {
+			notes[c.Field] = "corretto da un'autocorrezione di PanamaBook e confermato dall'operatore"
 		} else {
 			notes[c.Field] = "corretto a mano dall'operatore (il lettore aveva letto un altro valore)"
 		}

@@ -112,6 +112,29 @@ tabella, cioe' **con le tue correzioni** (non quello letto).
 - Se il browser nega l'accesso agli appunti il programma ripiega su `document.execCommand('copy')`; se fallisce anche quello mostra un
   messaggio chiaro ("seleziona il testo a mano e premi Ctrl+C").
 
+## Schede «Autocorrezioni» e «Novità di Panama»
+
+In alto, accanto al nome, ci sono tre schede: **Libretto** (il lavoro di prima), **Autocorrezioni** e **Novità di Panama**.
+
+### Autocorrezioni
+
+Quando correggi un campo e salvi, il programma impara una regola **valida per tutti i libretti**: «se in questo campo leggo `MAS`, il valore giusto e' `MASTER II/`». La volta dopo, su qualsiasi libretto, se legge lo stesso valore lo corregge da solo e segna il campo **Autocorretto** (con il valore letto accanto e «Rimetti il valore letto»). Le regole stanno in un file leggibile, `dati\autocorrezioni.json` (nessun dato personale), e si gestiscono nella scheda: **Aggiungi** una regola a mano, **Attiva** o spegni, **Cancella** (due clic).
+
+- Valgono solo per campi con pochi valori ricorrenti: tipo, codice paese, nazionalita', luogo di nascita, livello, qualifica (*capacity*) e *regional*. **Mai** per nomi, cognomi, numeri, date o sesso.
+- Si confronta il valore **intero** del campo (non una parte), senza distinguere maiuscole e spazi: `MAS` non tocca `MASTER`.
+- Se rimetti il valore letto su un campo autocorretto e salvi, la regola **si spegne da sola** (la riattivi dalla scheda). Se correggi ancora lo stesso valore letto con un altro valore, la regola si aggiorna.
+- La **memoria del singolo libretto** (scheda *Memoria*) ha la precedenza sulle autocorrezioni. Un valore autocorretto e lasciato com'e' non viene ricordato come correzione tua.
+- «Usi» conta le volte in cui la regola e' stata applicata e confermata. Massimo 500 regole.
+- **Importa dalla memoria** crea le regole dalle correzioni gia' ricordate per i singoli libretti (finestra *Memoria*): per ogni campo ammesso e valore letto prende la correzione su cui concordano piu' libretti; i pareggi si saltano e le regole esistenti non si toccano.
+
+### Novità di Panama
+
+Mostra le notizie **ufficiali** dell'Autorita' Marittima di Panama: l'**AMP** (`amp.gob.pa`, in **spagnolo**) e il **Panama Ship Registry** (`panamashipregistry.com`, che e' dell'AMP, in **inglese**). Non si traducono. Il programma legge i loro feed RSS pubblici **solo quando apri la scheda o premi Aggiorna** (mai all'avvio e mai in sottofondo; entro 30 minuti usa l'ultima lettura). L'ultima lettura riuscita resta in `dati\novita.json`, cosi' senza Internet vedi comunque le ultime novita'.
+
+- Fonti scritte nel programma (nessun indirizzo scelto dall'utente): solo HTTPS, solo quegli host, risposta massima 2 MB, 12 secondi per fonte; il testo ricevuto si pulisce dai tag e i link si aprono solo se puntano allo stesso sito.
+- Non viene inviato nessun dato dei libretti. Usa il proxy di sistema se c'e'.
+- Si spegne in *Impostazioni > Leggi le novita' ufficiali di Panama da Internet*: allora il programma non contatta nessun sito (utile se la rete dell'azienda non lo consente).
+
 ## Cartella di salvataggio
 
 Di norma immagini, JSON, PDF e la verita' (`verita\`) si salvano in `scans\` accanto al programma. In *Impostazioni > Cartella di salvataggio* si puo' scegliere
@@ -124,6 +147,31 @@ completo e si preme **Applica** (o Invio). Se il PC ha OneDrive compare il pulsa
 - Cambiando cartella i file gia' salvati **non si spostano**: «Ultime scansioni» mostra la cartella attuale.
 - Anteprime (`dati\anteprima\`), memoria e profilo di Edge restano sempre accanto al programma.
 - Sono **dati personali**: in una cartella OneDrive vengono sincronizzati nel cloud (per un uso aziendale scegli una cartella consentita dalla policy).
+
+## Scheda «Certificati»
+
+Legge i certificati di Panama che accompagnano il libretto: **SAT** (Security Awareness Training), **SD** (Security Duties), **SSO** (Ship Security Officer) e **CT** (Certificación de Trámite de Título, la ricevuta della domanda che serve per ottenere il libretto definitivo e che vale a bordo al massimo 3 mesi).
+
+1. **Apri PDF o immagine…** (PDF, PNG o JPEG, massimo 25 MB) oppure **Scansiona un foglio A4** (serve `libretto2.exe`: comando `libretto2 sheet`, foglio intero senza ritaglio, dal caricatore o dal vetro).
+2. Il programma legge il testo con l'OCR di Windows e riconosce il tipo. Accanto all'immagine compaiono i campi: quelli richiesti dal tipo hanno l'asterisco e, se mancano, il bordo arancione. Si possono correggere a mano e cambiare il tipo.
+3. **Salva** scrive due file in `<cartella di salvataggio>\certificati\`: il **PDF** del certificato (al massimo 1 MB: un PDF originale abbastanza piccolo si copia com'è, un'immagine o scansione diventa un PDF di una pagina) e il **JSON** con i campi. Il nome è `MARINEID - NOME (TIPO)`, per esempio `500123456 - MARIO ROSSI (SD)` (il Marine ID è la chiave univoca del marittimo: i file dello stesso marittimo stanno vicini). Se il nome esiste già si aggiunge « - 2». **Scarta** cancella i file di lavoro.
+
+Campi per tipo (date `GG-MM-AAAA`, numero documento `E-NNNNNNNNNA`):
+
+| Tipo | Campi richiesti |
+|---|---|
+| SAT | numero documento, scadenza, rilascio, nascita |
+| SD | numero documento, scadenza, nome, nascita, nazionalità, rilascio, Marine ID |
+| SSO | numero documento, nome, nascita, nazionalità, rilascio, scadenza |
+| CT | CT No., numero documento, nome, identificazione, capacity, rilascio, scadenza, consolato (Londra o Napoli, da «CONSUL ...»), Marine ID |
+
+Ogni campo ha il pulsante **Copia** e in basso c'è **Copia tutti i campi**.
+
+**Controllo doppio con il QR.** Il QR del certificato contiene il link al servizio di verifica dell'AMP. Il programma lo legge da solo e lo mostra sotto i campi; **Verifica online** interroga il servizio e confronta Marine ID (la chiave univoca del marittimo per Panama), nome, nascita, nazionalità, identificazione, rilascio e scadenza con quello che c'è nella scheda, e mostra lo stato online (per esempio «Valid»). Il controllo parte solo quando lo chiedi, solo verso l'indirizzo del servizio AMP (qualunque altro link nel QR viene ignorato) e invia solo il numero che sta già nel QR, nessun dato tuo. Il servizio usa HTTP non cifrato: serve internet. L'esito si salva nel JSON (`qr_url`, `online_check`).
+
+Gli altri campi stampati (nazionalità, numero di ricevuta, Marine ID...) si leggono comunque se ci sono. I file di lavoro stanno in `dati\certificati\` (`cert-*`) e si cancellano dopo un giorno. I certificati contengono dati personali: restano sul disco e non vanno condivisi. Un PDF digitale (come quelli dell'AMP) si legge dal suo testo incorporato, senza OCR e senza programmi esterni, e si mostra com'e'; solo un PDF senza testo viene reso in immagine (con `powershell.exe`, a finestra nascosta) e letto con l'OCR; da riga di comando: `certread file.pdf` (JSON) e `certread -rows file.pdf` (righe lette dall'OCR).
+
+**QR del libretto.** Anche la pagina dati del libretto ha un QR con il link al servizio AMP. Sotto «Dati del libretto» il programma lo mostra (se riesce a leggerlo: serve una scansione nitida, a 300 dpi) e **Verifica online** confronta Id Marino, nome, nascita, nazionalità, identificazione, numero del libretto, sesso, cargo, livello, emissione e scadenza con la pagina online. Il numero in fondo al link è il «Doc Number» del documento, non l'Id Marino (che la pagina online mostra come «Seafarers ID»).
 
 ## Impostazioni di scansione
 

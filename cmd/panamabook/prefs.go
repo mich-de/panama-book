@@ -23,8 +23,8 @@ const (
 var prefsLangs = map[string]bool{"en": true, "es": true, "it": true}
 
 // prefsKeys sono le chiavi accettate: lang (testo), scan (driver, dpi, lunghezza, margine), copy (formato di copia) e outdir
-// (cartella di output, testo: si cambia solo con /api/outdir, che la verifica).
-var prefsKeys = map[string]bool{"lang": true, "scan": true, "copy": true, "outdir": true}
+// (cartella di output, testo: si cambia solo con /api/outdir, che la verifica) e news ({"enabled": bool}, scheda Novita').
+var prefsKeys = map[string]bool{"lang": true, "scan": true, "copy": true, "outdir": true, "news": true}
 
 type prefsStore struct {
 	mu   sync.Mutex

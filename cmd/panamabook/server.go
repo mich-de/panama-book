@@ -20,13 +20,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"scanlibretto/internal/autocorr"
 	"scanlibretto/internal/memoria"
 )
 
 //go:embed web
 var webFS embed.FS
 
-const version = "1.0.1"
+const version = "1.0.2"
 
 // Valori consigliati per la scansione del libretto (tools\scansiona.cmd).
 const (
@@ -54,6 +55,9 @@ type App struct {
 	outRoot   string // cartella dove si salvano immagini, JSON e PDF (predefinita: scans\ accanto al programma, vedi outdir.go)
 	mem       *memoria.Archivio
 	prefs     *prefsStore
+	rules     *autocorr.Archivio // autocorrezioni globali (dati\autocorrezioni.json), vedi autocorr.go
+	news      newsState
+	certs     certStore // certificati letti e non ancora salvati, vedi certs.go
 	token     string
 	demoDelay time.Duration
 
@@ -87,8 +91,13 @@ func newApp(cfg config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	rules, err := autocorr.Apri(filepath.Join(cfg.Base, "dati", "autocorrezioni.json"))
+	if err != nil {
+		return nil, err
+	}
 	a := &App{
-		cfg: cfg, outRoot: filepath.Join(cfg.Base, "scans"),
+		rules: rules,
+		cfg:   cfg, outRoot: filepath.Join(cfg.Base, "scans"),
 		mem: mem, prefs: newPrefsStore(cfg.Base), token: randomHex(16), demoDelay: 1200 * time.Millisecond,
 		jobs: map[string]*Job{}, docs: map[string]*Doc{}, exitCh: make(chan struct{}),
 		allowedHosts: map[string]bool{}, allowedOrigins: map[string]bool{},
@@ -141,7 +150,17 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("GET /", http.FileServerFS(sub))
 	mux.HandleFunc("GET /api/state", a.hState)
 	mux.HandleFunc("POST /api/prefs", a.hPrefsSet)
+	mux.HandleFunc("GET /api/autocorr", a.hAutocorrList)
+	mux.HandleFunc("POST /api/autocorr", a.hAutocorrSet)
 	mux.HandleFunc("POST /api/outdir", a.hOutDir)
+	mux.HandleFunc("GET /api/news", a.hNews)
+	mux.HandleFunc("POST /api/cert/upload", a.hCertUpload)
+	mux.HandleFunc("POST /api/cert/scan", a.hCertScan)
+	mux.HandleFunc("GET /api/cert/image", a.hCertImage)
+	mux.HandleFunc("POST /api/cert/save", a.hCertSave)
+	mux.HandleFunc("POST /api/cert/verify", a.hCertVerify)
+	mux.HandleFunc("POST /api/amp/search", a.hAmpSearch)
+	mux.HandleFunc("POST /api/cert/discard", a.hCertDiscard)
 	mux.HandleFunc("POST /api/outdir/pick", a.hOutDirPick)
 	mux.HandleFunc("POST /api/heartbeat", a.hHeartbeat)
 	mux.HandleFunc("POST /api/bye", a.hBye)
@@ -158,6 +177,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /api/jobs/{id}", a.hJob)
 	mux.HandleFunc("POST /api/jobs/{id}/cancel", a.hCancel)
 	mux.HandleFunc("GET /api/doc/{id}", a.hDoc)
+	mux.HandleFunc("GET /api/doc/{id}/qr", a.hBookQR)
+	mux.HandleFunc("POST /api/doc/{id}/verify", a.hBookVerify)
 	mux.HandleFunc("POST /api/save", a.hSave)
 	mux.HandleFunc("POST /api/pdf", a.hPDF)
 	mux.HandleFunc("POST /api/reset", a.hReset)
@@ -498,6 +519,7 @@ func (a *App) hJob(w http.ResponseWriter, r *http.Request) {
 	v.ElapsedSec = int(end.Sub(j.Started).Seconds())
 	v.Done = j.Phase == phaseDone || j.Phase == phaseError || j.Phase == phaseCancelled
 	v.Preview = j.Preview
+	v.Cert = j.Cert
 	docID, phase := j.DocID, j.Phase
 	j.mu.Unlock()
 	if phase == phaseDone && docID != "" {

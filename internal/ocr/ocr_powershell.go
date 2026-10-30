@@ -40,6 +40,7 @@ func recognizePowerShell(ctx context.Context, imagePaths []string) ([]*Result, e
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "powershell.exe", args...)
+	hideWindow(cmd)
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	if err := cmd.Run(); err != nil {

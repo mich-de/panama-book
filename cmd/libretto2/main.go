@@ -1,4 +1,4 @@
-// Comando libretto2 (versione 1.0.0): scansione di un foglio A4 con lo scanner Epson WorkForce DS-1630 e ritaglio
+// Comando libretto2 (versione 1.0.2): scansione di un foglio A4 con lo scanner Epson WorkForce DS-1630 e ritaglio
 // dell'intero passaporto aperto (informativa + pagina dati, 125x176 mm), come nei facsimili AMP di Panama.
 //
 //	libretto2 info                          diagnostica dello scanner (non scansiona)
@@ -77,6 +77,8 @@ func main() {
 		err = cmdScan(os.Args[2:])
 	case "crop":
 		err = cmdCrop(os.Args[2:])
+	case "sheet": // foglio A4 intero, senza ritaglio: per i certificati (SAT, SD, SSO, CT)
+		err = cmdSheet(os.Args[2:])
 	case "read":
 		err = cmdRead(os.Args[2:])
 	case "extract": // compatibile con la GUI panamabook (stessi argomenti di libretto extract)
@@ -103,10 +105,11 @@ func exitCode(err error) int {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `libretto2 1.0.0 - Epson DS-1630, passaporto intero (informativa + pagina dati)
+	fmt.Fprint(os.Stderr, `libretto2 1.0.2 - Epson DS-1630, passaporto intero (informativa + pagina dati)
 uso:
   libretto2 info  [-device DS-1630]
   libretto2 scan  [-o file.png] [-dpi 300] [-gray] [-margin 2] [-raw foglio.png] [-yes] [-force]
+  libretto2 sheet [-o foglio.png] [-dpi 300] [-gray] [-source auto] [-yes] [-force]   scansiona un A4 e lo salva intero, senza ritaglio (certificati)
   libretto2 crop  -i foglio.png [-o file.png] [-margin 2] [-force]
   libretto2 pdf  -i immagine.png [-o file.pdf] [-max 1000000] [-dpi 300] [-force]   PDF di una pagina entro 1 MB (la GUI lo cerca come «libretto pdf»)
   libretto2 extract -i foglio.png [-page-out pagina-dati.png] [-force]   come la v1: JSON su stdout; -page-out = sola pagina dati (usato dalla GUI)
@@ -259,6 +262,41 @@ func acquireBook(o wia.Options, margin float64, raw string, yes bool, in string)
 		return "", "", func() {}, fmt.Errorf("foglio grezzo non salvato: %w", err)
 	}
 	return o.OutPath, raw, cleanup, saveBook(img, o.OutPath, margin)
+}
+
+// cmdSheet scansiona un foglio A4 e lo salva cosi' com'e', senza cercare il libretto: serve per i certificati.
+func cmdSheet(args []string) error {
+	o, _, _, yes, _ := scanFlags("sheet", args)
+	if o.OutPath == "" {
+		o.OutPath = filepath.Join("scans", "foglio-"+time.Now().Format("20060102-150405")+".png")
+	}
+	if err := os.MkdirAll(filepath.Dir(o.OutPath), 0o700); err != nil {
+		return fmt.Errorf("cartella di uscita: %w", err)
+	}
+	if err := confirmScan(yes); err != nil {
+		return err
+	}
+	match, err := resolveDevice(o.DeviceMatch)
+	if err != nil {
+		return err
+	}
+	o.DeviceMatch = match
+	if err := wia.Scan(o); err != nil {
+		if wia.IsPaperEmpty(err) {
+			err = fmt.Errorf("%w (suggerimento: appoggia il foglio A4 sul vetro oppure inseriscilo nel caricatore, e riprova)", err)
+		}
+		return err
+	}
+	img, err := imgproc.Load(o.OutPath)
+	if err != nil {
+		return fmt.Errorf("lettura della scansione: %w", err)
+	}
+	if imgproc.IsBlank(img) {
+		_ = os.Remove(o.OutPath)
+		return errors.New("scansione vuota: nessun documento rilevato")
+	}
+	fmt.Println("salvato", o.OutPath)
+	return nil
 }
 
 func cmdScan(args []string) error {
